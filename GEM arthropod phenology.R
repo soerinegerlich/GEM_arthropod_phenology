@@ -562,5 +562,3 @@ ggplot(data=subset(dfOPE,SpeciesID=="Chironomidae"), aes(as.integer(as.character
 #Her er samme type plot, blot for en anden artsgruppe
 ggplot(data=subset(dfOPE,SpeciesID=="Muscidae"&Pheno.Event=="Peak"), aes(as.integer(as.character(Year)),DOY, colour=Plot))+
   geom_line()+geom_point()+ylab("Day of year")+facet_grid(~SpeciesID,scales = "free_y")+theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-#Test kommentar
