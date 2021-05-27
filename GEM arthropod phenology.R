@@ -10,7 +10,10 @@ library(corrplot)
 
 ##### Zackenberg data - downloaded 16 April 2021 #####
 
-df1 <- read.csv2("/Users/Soerine/Documents/PhD projekt/Data_Arthropods Zackenberg/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence1604202114574319.csv",sep="\t",stringsAsFactors = FALSE)
+#/Users/Soerine/Documents/PhD projekt/Data/Data_Arthropods Zackenberg
+
+
+df1 <- read.csv2("Data/df1_raw/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence1604202114574319.csv",sep="\t",stringsAsFactors = FALSE)
 #df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence030120201503537843.csv",sep="\t",stringsAsFactors = FALSE)
 #df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_phenology191220172147231575.csv",sep="\t")
 #df1 <- read_excel("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence030120201503537843.xlsx")
@@ -155,17 +158,31 @@ df2%>%
   gather(key=SpeciesID,value=Abundance,22:87)->df3
 #help(mutate)
 
+#Sørger lige for at fjerne alle NA og erstatter med 0.
+df3$Abundance[is.na(df3$Abundance)] <- 0
+#Kolonne med Event oprettes. Hvis abundansen er mere end 0 skrives 1, ellers 0.
+#Dette for at sige at der er et event.
+df3$Event<-ifelse(df3$Abundance>0,1,0)
 
 df3%>%
   subset(Month>5&Month<9)%>% #månderne maj til september er relevante
-  group_by(SpeciesID,Plot)%>%
-  summarise(TotalAbundance= sum(Abundance))->df2a
+  group_by(SpeciesID,Plot,Year)%>%
+  summarise(TotalAbundance=sum(Abundance),TotalEvents=sum(Event))->df2a
 
-df2a$Include<-ifelse(df2a$TotalAbundance<500,0,1)#Need at least 100 individuals across years per plot 
+df2a$Include<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2,1,0)#Need at least ? individuals in a season and 3 capture events
+#mindst 25 individer, indsamlet mindst 3 gange. På et enket år for en enkel art og plot.
+#df2a$Include<-ifelse(df2a$TotalAbundance<500,0,1)#Need at least 100 individuals across years per plot 
 #I den nye kolonne som hedder Include. Ifelse(test_expression,x,y). Resultater vises som enten 0 (mindre end 500) eller 1 (højere end 500).
 #Der sorteres efter total abundans i df2a som derefter skal overføres til df3.
 #Filter original data for sampling criterias
-df3$Include <- (df2a$Include[match(paste0(df3$SpeciesID,df3$Plot),paste0(df2a$SpeciesID,df2a$Plot))])#paste betyder at det er kombinationen af variable der skal matche.
+df3$Include <- (df2a$Include[match(paste0(df3$SpeciesID,df3$Year,df3$Plot),paste0(df3$SpeciesID,df3$Year,df3$Plot))])#paste betyder at det er kombinationen af variable der skal matche.
+#Her er lavet en include kolonne i df3 der har resultaterne af include fra df2a.
+#Her er det vigtigt at notere at denne include kommer ved alle de DOY, arter, year, plot hvor der er en include fordi der har været 3 events ÅRLIGT for denne art, plot, og der har været en abundans over 10.
+#df3$Include<-ifelse(df3$TotalAbundanceYear>24&df3$TotalEventsYear>2,1,0)
+
+#Nu vil vi gerne have speciesID til at stå før plot.
+df4 <-df3 %>% 
+  select(SpeciesID, everything())
 
 #Trapdays
 df3%>%
@@ -273,17 +290,17 @@ df3%>%
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
 ####NYT DATASÆT SOM SKAL BRUGES TIL GAM####
-df8 <- data.frame(df3)
-df4 <- select(df8, SpeciesID,Plot,Year,DOY,Abundance,Trapdays)
-df4$AbundancePTD <- (df4$Abundance/df4$Trapdays)
-df4$Include <- (df2a$Include[match(paste0(df4$SpeciesID,df4$Plot),paste0(df2a$SpeciesID,df2a$Plot))])
+df6 <- data.frame(df3)
+df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event,Trapdays)
+df5$AbundancePTD <- (df5$Abundance/df5$Trapdays)
+#df5$Include <- (df2a$Include[match(paste0(df4$SpeciesID,df4$Plot),paste0(df2a$SpeciesID,df2a$Plot))])
 #Summarise funktionen giver ikke de rigtige resultater.
 #summarise(Abundance = sum(Abundance),Trapdays=sum(Trapdays),AbundancePTD=Abundance/Trapdays)->df4
 
 #Nogle resultater bliver NaN (kan ikke vise tallet) under AbundansPTD
 #Skal include inkluderes i group by?
 
-write.csv(df4, file = 'df4.csv')
+write.csv(df5, file = 'EMdata_final.csv')
 
 #Crosscorrelations between plots
 df3%>%
