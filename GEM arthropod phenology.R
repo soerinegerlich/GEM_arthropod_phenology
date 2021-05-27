@@ -300,7 +300,8 @@ df5$AbundancePTD <- (df5$Abundance/df5$Trapdays)
 #Nogle resultater bliver NaN (kan ikke vise tallet) under AbundansPTD
 #Skal include inkluderes i group by?
 
-write.csv(df5, file = 'EMdata_final.csv')
+write.csv(df5, file = 'Data/Dataset_for_GAM/EMdata_final.csv', row.names=FALSE)
+#row.names=FALSE fjerne første kolonne, da vi ellers får et problem med en kolonne X.
 
 #Crosscorrelations between plots
 df3%>%
@@ -387,13 +388,22 @@ head(dftest)
 #df4 = SpeciesID, Plot, Year, DOY, Abundance, Event, Include
 ############################################################
 
-df5<- read.csv("ZAC_all.csv")
+#df7<- read.csv("ZAC_all.csv")
+df7<-read.csv2("Data/Dataset_for_GAM/EMdata_final.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
+
+#df8<-subset(df7,select=-c(X))
+
 #Her læses filen ind som et tabel, da det er sådan den er gemt ovenfor.
 #Man kunne også gemme den som en csv (ligesom den til Toke) og så læse den ind som csv.
 #df5 <- read.csv("EMdata.csv", header = TRUE)
 
-df5$Year<- as.factor(df5$Year)#den var en integer, men det er nemmere at arbejde med den som en faktor.
+df7$Year<- as.factor(df7$Year)#den var en integer, men det er nemmere at arbejde med den som en faktor.
+df7$SpeciesID<- as.factor(df7$SpeciesID)
+df7$Plot<- as.factor(df7$Plot)
 
+class(df7$Abundance)
+df7$Abundance<-as.numeric(df7$Abundance)
+class(df7$Abundance)
 
 ####################
 # Herunder er fire funktioner (phenodate,phenogam,modpred,EM), der udfører trin i beregningen af
@@ -416,10 +426,10 @@ phenodate<-function(mod,em.level)
 
 
 #### phenogam --- FUNKTION ####
-phenogam <- function(SpeciesID, Plot, Year, data = df5)
+phenogam <- function(SpeciesID, Plot, Year, data = df7)
   {y <- data[ data$SpeciesID == SpeciesID & 
               data$Plot == Plot &
-              data$Year == Year, ] # Extracting data from species, plot, year combination from df5
+              data$Year == Year, ] # Extracting data from species, plot, year combination from df7
     event <- length(y[y$Abundance >= 1, 1])
     cum.abundance <- sum(y$Abundance)
     if(event <= 2 || cum.abundance <= 24) # Mindst 3 events for at lave g værdi og/eller 25+ abundans.
@@ -431,7 +441,7 @@ phenogam <- function(SpeciesID, Plot, Year, data = df5)
 
 
 #### modpred --- FUNKTION ####
-modpred <- function(SpeciesID, Plot, Year, data = df5)
+modpred <- function(SpeciesID, Plot, Year, data = df7)
   {y <- data[ data$SpeciesID == SpeciesID & 
               data$Plot == Plot & 
               data$Year == Year, ] # Extracting data from species, plot, year combination
@@ -450,9 +460,9 @@ modpred <- function(SpeciesID, Plot, Year, data = df5)
 
 
 #### EM --- FUNKTION ####
-EM <- sapply(levels(df5$SpeciesID), function(SpeciesID)
-        {sapply(levels(df5$Plot), function(Plot)
-          {sapply(levels(df5$Year), function(Year)
+EM <- sapply(levels(df7$SpeciesID), function(SpeciesID)
+        {sapply(levels(df7$Plot), function(Plot)
+          {sapply(levels(df7$Year), function(Year)
             {ope.liste <- c(modpred(SpeciesID = SpeciesID, Plot = Plot, Year = Year))
       return(ope.liste)})})})
 # Denne funktion looper gennem alle arter, plots og år og returnerer en liste med alle beregninger. 
