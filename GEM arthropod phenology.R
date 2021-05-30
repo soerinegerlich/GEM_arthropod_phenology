@@ -459,12 +459,21 @@ modpred <- function(SpeciesID, Plot, Year, data = df7)
 # phenodate for at beregne Onset, Peak og End for de predikterede værdier
 
 
+print(df7$SpeciesID)
+print(levels(df7$SpeciesID))
 #### EM --- FUNKTION ####
-EM <- sapply(levels(df7$SpeciesID), function(SpeciesID)
-        {sapply(levels(df7$Plot), function(Plot)
-          {sapply(levels(df7$Year), function(Year)
-            {ope.liste <- c(modpred(SpeciesID = SpeciesID, Plot = Plot, Year = Year))
-      return(ope.liste)})})})
+EM <- sapply(levels(df7$SpeciesID), function(SpeciesID) {
+        print(SpeciesID)
+        
+        sapply(levels(df7$Plot), function(Plot) {
+          #print("Plot")
+          sapply(levels(df7$Year), function(Year) {
+            #print("Year")
+            ope.liste <- c(modpred(SpeciesID = SpeciesID, Plot = Plot, Year = Year))
+            return(ope.liste)
+          })
+        })
+      })
 # Denne funktion looper gennem alle arter, plots og år og returnerer en liste med alle beregninger. 
 # Den tager nogle minutter om at køre
 # ope.liste = onset, peak, end, listen.
