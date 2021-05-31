@@ -11,9 +11,10 @@ library(corrplot)
 ##### Zackenberg data - downloaded 16 April 2021 #####
 
 #/Users/Soerine/Documents/PhD projekt/Data/Data_Arthropods Zackenberg
+#C:\Users\au511627\OneDrive - Aarhus Universitet\PhD projekt\Data\Data_Arthropods Zackenberg\View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence1604202114574319
 
 
-df1 <- read.csv2("Data/df1_raw/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence1604202114574319.csv",sep="\t",stringsAsFactors = FALSE)
+df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence1604202114574319.csv",sep="\t",stringsAsFactors = FALSE)
 #df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence030120201503537843.csv",sep="\t",stringsAsFactors = FALSE)
 #df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_phenology191220172147231575.csv",sep="\t")
 #df1 <- read_excel("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence030120201503537843.xlsx")
@@ -22,9 +23,12 @@ df1 <- read.csv2("Data/df1_raw/View_BioBasis_Zackenberg_Data_Arthropods_Arthropo
 #Rename columns.
 #Det er bestemt at der ikke skal være mellemrum mellem snow og bogstav, also 
 df1 = df1 %>% rename("DaysA"="Days.A", "DaysB"="Days.B", "DaysC"="Days.C", "DaysD"="Days.D", "DaysE"="Days.E", "DaysF"="Days.F", "DaysG"="Days.G", "DaysH"="Days.H")
-#df1 = df1 %>% rename("Plot"="Plot.ID", "Date"="ï..Date") #Fejl vises ved Date. Umiddelbart ikke nødvendigt at bruge.
+df1 = df1 %>% rename("Plot"="Plot.ID", "Date"="ï..Date") #Fejl vises ved Date. 
 df1 = df1 %>% rename("Plot"="Plot.ID")
 #% betyder at man ændre i tabellen ikke laver en ny baseret på den gamle. Det bliver overskrevet.
+
+#tz(x)<- "Europe/Berlin" #Hvis der er problemer med tidszone
+
 
 #Her skal vi i alle Days kolonnerne erstatte -9999 med NA, dette fordi i vores excel art står der -9999, men de betyder bare at der ikke er noget snow.
 df1$DaysA[df1$DaysA == -9999] <- NA #Replace '-9999' with 'NA'
@@ -165,7 +169,7 @@ df3$Abundance[is.na(df3$Abundance)] <- 0
 df3$Event<-ifelse(df3$Abundance>0,1,0)
 
 df3%>%
-  subset(Month>5&Month<9)%>% #månderne maj til september er relevante
+  subset(Month>5&Month<9)%>% #månderne maj til september
   group_by(SpeciesID,Plot,Year)%>%
   summarise(TotalAbundance=sum(Abundance),TotalEvents=sum(Event))->df2a
 
@@ -177,7 +181,7 @@ df2a$Include<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2,1,0)#Need at leas
 #Filter original data for sampling criterias
 df3$Include <- (df2a$Include[match(paste0(df3$SpeciesID,df3$Year,df3$Plot),paste0(df3$SpeciesID,df3$Year,df3$Plot))])#paste betyder at det er kombinationen af variable der skal matche.
 #Her er lavet en include kolonne i df3 der har resultaterne af include fra df2a.
-#Her er det vigtigt at notere at denne include kommer ved alle de DOY, arter, year, plot hvor der er en include fordi der har været 3 events ÅRLIGT for denne art, plot, og der har været en abundans over 10.
+#Her er det vigtigt at notere at denne include kommer ved alle de DOY, arter, year, plot hvor der er en include fordi der har været 3 events ÅRLIGT for denne art, plot, og der har været en abundans over 25.
 #df3$Include<-ifelse(df3$TotalAbundanceYear>24&df3$TotalEventsYear>2,1,0)
 
 #Nu vil vi gerne have speciesID til at stå før plot.
@@ -291,16 +295,15 @@ df3%>%
 
 ####NYT DATASÆT SOM SKAL BRUGES TIL GAM####
 df6 <- data.frame(df3)
-df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event,Trapdays)
-df5$AbundancePTD <- (df5$Abundance/df5$Trapdays)
+df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event)
+#df5$AbundancePTD <- (df5$Abundance/df5$Trapdays)
 #df5$Include <- (df2a$Include[match(paste0(df4$SpeciesID,df4$Plot),paste0(df2a$SpeciesID,df2a$Plot))])
 #Summarise funktionen giver ikke de rigtige resultater.
 #summarise(Abundance = sum(Abundance),Trapdays=sum(Trapdays),AbundancePTD=Abundance/Trapdays)->df4
 
 #Nogle resultater bliver NaN (kan ikke vise tallet) under AbundansPTD
-#Skal include inkluderes i group by?
 
-write.csv(df5, file = 'Data/Dataset_for_GAM/EMdata_final.csv', row.names=FALSE)
+write.csv(df5, file = "Data/Dataset_for_GAM\\EMdata_final.csv", row.names=FALSE)
 #row.names=FALSE fjerne første kolonne, da vi ellers får et problem med en kolonne X.
 
 #Crosscorrelations between plots
@@ -402,8 +405,17 @@ df7$SpeciesID<- as.factor(df7$SpeciesID)
 df7$Plot<- as.factor(df7$Plot)
 
 class(df7$Abundance)
+typeof(df7$Abundance)
 df7$Abundance<-as.numeric(df7$Abundance)
 class(df7$Abundance)
+
+#class(df7$Trapdays)
+#df7$Trapdays<-as.integer(df7$Trapdays)
+#class(df7$Trapdays)
+
+#class(df7$AbundancePTD)
+#df7$AbundancePTD<-as.numeric(df7$AbundancePTD)
+#class(df7$AbundancePTD)
 
 ####################
 # Herunder er fire funktioner (phenodate,phenogam,modpred,EM), der udfører trin i beregningen af
@@ -464,7 +476,6 @@ print(levels(df7$SpeciesID))
 #### EM --- FUNKTION ####
 EM <- sapply(levels(df7$SpeciesID), function(SpeciesID) {
         print(SpeciesID)
-        
         sapply(levels(df7$Plot), function(Plot) {
           #print("Plot")
           sapply(levels(df7$Year), function(Year) {
@@ -483,12 +494,12 @@ EM <- sapply(levels(df7$SpeciesID), function(SpeciesID) {
 dfEM <- as.data.frame(EM)
 #Her tilføjes beskrivende variable
 dfEM$Pheno.Event <- rep(c("Onset","Peak","End"),154)
-dfEM$Year<- rep(c(seq(1996,2009,by=1),seq(2011,2018,by=1)),each=3,times=7)
+dfEM$Year<- rep(c(seq(1996,2009,by=1),seq(2011,2019,by=1)),each=3,times=7)
 dfEM$Plot<-rep(c("Art1","Art2","Art3","Art4","Art5","Art6","Art7"),each=66)
 
 
 #Her stables alle artsdata ovenpå hinanden.
-dfOPE <- gather(dfEM,key=SpeciesID,value=DOY,1:69)
+dfOPE <- gather(dfEM,key=SpeciesID,value=DOY,1:67)
 #OPE = Onset, Peak, End
 write.csv(dfOPE, file="OPE_liste.csv")
 write.table(dfOPE, file = "OPE_liste.txt", sep = "\t")
