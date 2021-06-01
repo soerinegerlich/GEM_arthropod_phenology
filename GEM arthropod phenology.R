@@ -24,7 +24,7 @@ df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emerge
 #Det er bestemt at der ikke skal være mellemrum mellem snow og bogstav, also 
 df1 = df1 %>% rename("DaysA"="Days.A", "DaysB"="Days.B", "DaysC"="Days.C", "DaysD"="Days.D", "DaysE"="Days.E", "DaysF"="Days.F", "DaysG"="Days.G", "DaysH"="Days.H")
 df1 = df1 %>% rename("Plot"="Plot.ID", "Date"="ï..Date") #Fejl vises ved Date. 
-df1 = df1 %>% rename("Plot"="Plot.ID")
+#df1 = df1 %>% rename("Plot"="Plot.ID")
 #% betyder at man ændre i tabellen ikke laver en ny baseret på den gamle. Det bliver overskrevet.
 
 #tz(x)<- "Europe/Berlin" #Hvis der er problemer med tidszone
@@ -493,62 +493,85 @@ EM <- sapply(levels(df7$SpeciesID), function(SpeciesID) {
 #Her laves listen (EM) om til en dataframe
 dfEM <- as.data.frame(EM)
 #Her tilføjes beskrivende variable
-dfEM$Pheno.Event <- rep(c("Onset","Peak","End"),154)
+dfEM$Pheno.Event <- rep(c("Onset","Peak","End"),161) #23*7=161
 dfEM$Year<- rep(c(seq(1996,2009,by=1),seq(2011,2019,by=1)),each=3,times=7)
-dfEM$Plot<-rep(c("Art1","Art2","Art3","Art4","Art5","Art6","Art7"),each=66)
+dfEM$Plot<-rep(c("Art1","Art2","Art3","Art4","Art5","Art6","Art7"),each=69)#23*3=69
 
 
 #Her stables alle artsdata ovenpå hinanden.
-dfOPE <- gather(dfEM,key=SpeciesID,value=DOY,1:67)
+dfOPE <- gather(dfEM,key=SpeciesID,value=DOY,1:69,-Year,-Plot,-Pheno.Event)
+#ncol(dfEM) kan erstatte 69.
+#length(dfEM). For at finde ud af længden af datasættet. Det er 69.
 #OPE = Onset, Peak, End
-write.csv(dfOPE, file="OPE_liste.csv")
-write.table(dfOPE, file = "OPE_liste.txt", sep = "\t")
+#write.csv(df5, file = "Data/Dataset_for_GAM\\EMdata_final.csv", row.names=FALSE)
+write.csv(dfOPE, file = "Data/Dataset_for_GAM\\dfOPE_dataframe.csv", row.names=FALSE)
+#write.table(dfOPE, file = "OPE_liste.txt", sep = "\t")
+dfOPE<-read.csv2("Data/Dataset_for_GAM/dfOPE_dataframe.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
 #Denne fil er nu noget der skal bruges til nogen ggplots
 
 #Der skal lige laves en ekstra tabel med minimum, gennemsnitlig og maximum pheno.events per art per plot.
-dfOPEsub <- subset(dfOPE, dfOPE$DOY != "NA", select=-Year)
-dfOPEsub%>%group_by(SpeciesID,Plot,Pheno.Event)%>%summarise(MinDOY= min(DOY), MeanDOY = mean(DOY), MaxDOY = max(DOY))->dfOPEsub
-write.table(dfOPEsub, file="OPE_mmm.txt",sep = "\t")
+dfOPEsub <- subset(dfOPE, dfOPE$DOY!= "NA", select=-Year)
+#Husk at arbejde med DOY som numerisk værdi, ellers melder den fejl.
+class(dfOPEsub$DOY)
+dfOPEsub$DOY<-as.numeric(dfOPEsub$DOY)
+class(dfOPEsub$DOY)
+dfOPEsub[,"DOY", drop = FALSE]
+dfOPEsub%>%
+  group_by(SpeciesID,Plot,Pheno.Event)%>%
+  summarise(MinDOY= min(DOY), MeanDOY= mean(DOY),MaxDOY = max(DOY))->dfOPEsub
+write.table(dfOPEsub, file="Data/Dataset_for_GAM\\OPE_mmm.txt",sep = "\t")
+
 
 #Her har JEG lavet kolonner fra Onset, Peak, og Event.
-#Har også lavet en kolonne der udregner duration, derefter omarangeret kolonnerne.
-df6 <- dfOPE %>% spread(Pheno.Event, DOY)
-df6$Duration <- (df6$End - df6$Onset)
-df6 <- df6 %>% select(Year, Plot, SpeciesID, Onset, Peak, End, Duration)
-df6sub <- subset(df6, df6$Duration != "NA") #Dette subset er kun værdier der ikke har NA
-df6$Year<- as.factor(df6$Year)
-df6sub$Year<- as.factor(df6sub$Year)
-#Her husker man at lave year om til en faktor, hvis nu df6 el. df6sub skal bruges til udregninger.
+#Har også lavet en kolonne der udregner duration, derefter omarrangeret kolonnerne.
+df8 <- dfOPE %>% spread(Pheno.Event, DOY)
+class(dfOPE$End)
+df8$End<-as.numeric(df8$End)
+df8$Onset<-as.numeric(df8$Onset)
+df8$Duration <- (df8$End - df8$Onset)
+df8 <- df8 %>% 
+  select(Year, Plot, SpeciesID, Onset, Peak, End, Duration)
+df8sub <- subset(df8, df8$Duration != "NA") #Dette subset er kun værdier der ikke har NA
+df8$Year<- as.factor(df8$Year)
+df8sub$Year<- as.factor(df8sub$Year)
+#Her husker man at lave year om til en faktor, hvis nu df8 el. df8sub skal bruges til udregninger.
 
-write.csv(df6, file="duration.csv")
-write.csv(df6sub, file="duration_subset.csv")
-write.table(df6sub, file="duration_subset.txt",sep ="\t")
-#Her laver jeg lige filer af df6 og df6sub, så behøves jeg bare læse dem.
+write.csv(df8, file="Data/Dataset_for_GAM\\duration.csv", row.names = FALSE)
+write.csv(df8sub, file="Data/Dataset_for_GAM\\duration_subset.csv",row.names = FALSE)
+write.table(df8sub, file="Data/Dataset_for_GAM\\duration_subset.txt",sep ="\t",row.names = FALSE)
+#Her laver jeg lige filer af df8 og df8sub, så behøves jeg bare læse dem.
 
 
 ############################################################
 #NU ER DER LAVET ET GEMT DATA DER INDEHOLDER:
 #dfOPE = Pheno.Event, Year, Plot, SpeciesID, DOY.
-#df6 =  Year, Plot, SpeciesID, Onset, Peak, End, Duration.
-#df6sub = Year, Plot, SpeciesID, Onset, Peak, End, Duration. (minus dem med NA)
+#df8 =  Year, Plot, SpeciesID, Onset, Peak, End, Duration.
+#df8sub = Year, Plot, SpeciesID, Onset, Peak, End, Duration. (minus dem med NA)
 ############################################################
 
 
 #Her indlæses filer med data der skal testes.
-df5<- read.csv("ZAC_all.csv")
-df5$Year<- as.factor(df5$Year)
+df7<-read.csv2("Data/Dataset_for_GAM/EMdata_final.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
+#df5<- read.csv("ZAC_all.csv")
+df7$Year<- as.factor(df7$Year)
 
-#Nu skal filerne TESTES - Der er blevet lavet en loop der indsætter alle SpeciesID i en fil. (df5)
-df5%>%group_by(SpeciesID, Plot, Year)%>%summarise(Include= max(Include))->df5temp
-df5temp%>%group_by(SpeciesID, Plot)%>%summarise(Total_GAM= sum(Include))->df5GAM
-df5include <- subset(df5GAM, Total_GAM >= 10)
+#Nu skal filerne TESTES - Der er blevet lavet en loop der indsætter alle SpeciesID i en fil. (df7)
+df7%>%
+  group_by(SpeciesID, Plot, Year)%>%
+  summarise(Include= max(Include))->df7temp
+df7temp%>%
+  group_by(SpeciesID, Plot)%>%
+  summarise(Total_GAM= sum(Include))->df7GAM
+df7include <- subset(df7GAM, Total_GAM >= 5)
+#>= 10 eller 5 eller?
 
-#########unique(df5include$SpeciesID)
+#########unique(df7include$SpeciesID)
 
 ##Laver en fil i en folder med figures for alle 69 species.
-for (k in unique(df5$SpeciesID)){
-  dfsub<-subset(df5,SpeciesID==k)
-  pdf(paste("Figures/Fig. ",k,".pdf"),width=20,height=12)
+df7$Abundance<- as.numeric(df7$Abundance)
+for (k in unique(df7$SpeciesID)){
+  dfsub<-subset(df7,SpeciesID==k)
+  pdf(paste("Figures",k,".pdf"),width=20,height=12)
   par(mfrow=c(7,22),oma = c(5,5,4,0) ,mar = c(2,1,2,2) + 0.1) #it goes c(bottom, left, top, right) 
   for (i in unique(dfsub$Plot)){
     for(j in unique(dfsub$Year)){
