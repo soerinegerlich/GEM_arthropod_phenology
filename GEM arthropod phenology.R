@@ -515,7 +515,7 @@ dfOPEsub <- subset(dfOPE, dfOPE$DOY!= "NA", select=-Year)
 class(dfOPEsub$DOY)
 dfOPEsub$DOY<-as.numeric(dfOPEsub$DOY)
 class(dfOPEsub$DOY)
-dfOPEsub[,"DOY", drop = FALSE]
+#dfOPEsub[,"DOY", drop = FALSE] #For at ændre dimensioner. Det er dog nok at ændre typen.
 dfOPEsub%>%
   group_by(SpeciesID,Plot,Pheno.Event)%>%
   summarise(MinDOY= min(DOY), MeanDOY= mean(DOY),MaxDOY = max(DOY))->dfOPEsub
@@ -524,7 +524,8 @@ write.table(dfOPEsub, file="Data/Dataset_for_GAM\\OPE_mmm.txt",sep = "\t")
 
 #Her har JEG lavet kolonner fra Onset, Peak, og Event.
 #Har også lavet en kolonne der udregner duration, derefter omarrangeret kolonnerne.
-df8 <- dfOPE %>% spread(Pheno.Event, DOY)
+df8 <- dfOPE %>% 
+  spread(Pheno.Eve nt, DOY)
 class(dfOPE$End)
 df8$End<-as.numeric(df8$End)
 df8$Onset<-as.numeric(df8$Onset)
@@ -602,12 +603,12 @@ for (k in unique(df7$SpeciesID)){
 #################################################################
 
 #Her indlæses filer med data der er blevet testet og nu skal der arbejdes videre
-dfOPE <- read.csv("OPE_liste.csv")
+dfOPE <- read.csv("Data/Dataset_for_GAM/dfOPE_dataframe.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
 dfOPE$Year<- as.factor(dfOPE$Year)
-df6 <- read.csv("duration.csv", header= TRUE)
-df6$Year<- as.factor(df6$Year)
-df6sub <- read.csv("duration_subset.csv", header=TRUE)
-df6sub$Year<- as.factor(df6sub$Year)
+df8 <- read.csv("Data/Dataset_for_GAM\\duration.csv", sep=",",stringsAsFactors = FALSE, header = TRUE)
+df8$Year<- as.factor(df8$Year)
+df8sub <- read.csv2("Data/Dataset_for_GAM\\duration_subset.txt",  sep="\t",stringsAsFactors = FALSE, header = TRUE)
+df8sub$Year<- as.factor(df8sub$Year)
 
 head(dfOPE)
 
@@ -615,13 +616,34 @@ head(dfOPE)
 ggplot(data=dfOPE, aes(Year,DOY, colour=Pheno.Event)) + ylab("Day of Year") + 
   geom_boxplot() + facet_wrap(~Pheno.Event,scales = "free_y") + 
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+
+# TEST SØRINE
+createPdfForSpecies <- function(data, species){
+  dataBySpecies <- subset(data,SpeciesID==species)
   
+  speciesPlot <- ggplot(data=dataBySpecies, aes(Year,DOY, colour=Pheno.Event)) + ylab("Day of Year") + 
+    geom_boxplot() + facet_wrap(~Pheno.Event,scales = "free_y") + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 0)) + ggtitle(species)
+  
+  pdf(paste("Data/OPE_figures_by_species\\",species,".pdf", sep=""),width=10,height=6)
+  print(speciesPlot)
+  dev.off()
+}
+
+for (species in unique(df8sub$SpeciesID)){
+  print(species)
+  createPdfForSpecies(dfOPE, species)
+}
+
+
+# TEST SØRINE END
 
 ggplot(data=subset(dfOPE,Pheno.Event=="Peak"),aes(Year,DOY)) + ylab("Day of Year") + geom_boxplot() + 
   facet_wrap(~SpeciesID,scales = "free_y") + 
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
-ggplot(data=df6sub, aes(Year,Duration)) + ylab("Day of Year") + geom_boxplot() + 
+ggplot(data=df8sub, aes(Year,Duration)) + ylab("Day of Year") + geom_boxplot() + 
   facet_wrap(~SpeciesID,scales = "free_y") + 
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
