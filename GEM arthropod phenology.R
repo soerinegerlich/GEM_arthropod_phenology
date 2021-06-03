@@ -525,7 +525,7 @@ write.table(dfOPEsub, file="Data/Dataset_for_GAM\\OPE_mmm.txt",sep = "\t")
 #Her har JEG lavet kolonner fra Onset, Peak, og Event.
 #Har også lavet en kolonne der udregner duration, derefter omarrangeret kolonnerne.
 df8 <- dfOPE %>% 
-  spread(Pheno.Eve nt, DOY)
+  spread(Pheno.Event, DOY)
 class(dfOPE$End)
 df8$End<-as.numeric(df8$End)
 df8$Onset<-as.numeric(df8$Onset)
@@ -617,6 +617,79 @@ ggplot(data=dfOPE, aes(Year,DOY, colour=Pheno.Event)) + ylab("Day of Year") +
   geom_boxplot() + facet_wrap(~Pheno.Event,scales = "free_y") + 
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
+class(dfOPE$DOY)
+
+#ggplot(data=dfOPE, aes(Year,DOY, colour=Pheno.Event)) + ylab("Day of Year") + 
+  #geom_point(data=dfOPE,aes(Year,DOY)) + geom_point(data=dfOPE,aes(Year,mean(dfOPE$DOY)))+geom_errorbar(data=dfOPE,mean(dfOPE$DOY),ymin=mean(dfOPE$DOY)-sd(dfOPE$DOY),ymax=mean(dfOPE$DOY)-sd(dfOPE$DOY)) + facet_wrap(~Pheno.Event,scales = "free_y") + 
+  #theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+####FIGUR FOR ACARI####
+df8sub %>% group_by(SpeciesID, Year) -> df8subGroupBy
+
+dfTestAcari1 <- subset(df8subGroupBy,SpeciesID=="Acari")
+
+
+ggplot(data=dfTestAcari1, aes(Year,Onset)) + 
+  ylab("Day of Year")+ 
+  geom_point(shape = 1,size=2)+
+  geom_point(data=dfTestAcari1, aes(Year,Peak), shape = 2,size=2)+
+  geom_point(data=dfTestAcari1, aes(Year,End),shape = 0,size=2)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+
+ggplot(data=df8sub, aes(Year,Onset)) + 
+  ylab("Day of Year")+ 
+  geom_point(shape = 1,size=2)+
+  geom_point(data=df8sub, aes(Year,Peak), shape = 2,size=2)+
+  geom_point(data=df8sub, aes(Year,End),shape = 0,size=2)+
+  facet_wrap(~SpeciesID,scales = "free_y")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+
+####FIGUR FOR ACARI MED MEAN PLOT####
+ggplot(data=dfTestAcari, aes(Year,Onset)) + 
+  ylab("Day of Year") + 
+  geom_point() + 
+  #geom_errorbar(
+    #data=dfOPE2,
+    #aes(
+     # mean(DOY),
+      #ymin=mean(DOY)-sd(DOY),
+      #ymax=mean(DOY)-sd(DOY)))+
+  geom_point(data=dfTestAcari, aes(Year,Peak),colour='red',size=1.5)+
+  geom_point(data=dfTestAcari, aes(Year,End),colour='blue',size=1.5)+
+  geom_errorbar(data=dfTestAcari, aes(Year,Onset,ymin=Onset-OnsetSD,ymax=Onset+OnsetSD), colour = 'black', width = 0.4)+
+  geom_errorbar(data=dfTestAcari, aes(Year,Peak,ymin=Peak-PeakSD,ymax=Peak+PeakSD), colour = 'red', width = 0.4)+
+  geom_errorbar(data=dfTestAcari, aes(Year,End,ymin=End-EndSD,ymax=End+EndSD), colour = 'blue', width = 0.4)+
+   theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+
+p <- ggplot(data=dfTest, aes(Year,Onset)) + 
+  ylab("Day of Year") + 
+  geom_point() + 
+  #geom_errorbar(
+  #data=dfOPE2,
+  #aes(
+  # mean(DOY),
+  #ymin=mean(DOY)-sd(DOY),
+  #ymax=mean(DOY)-sd(DOY)))+
+  geom_point(data=dfTest, aes(Year,Peak),colour='red',size=1.5)+
+  geom_point(data=dfTest, aes(Year,End),colour='blue',size=1.5)+
+  geom_errorbar(data=dfTest, aes(Year,Onset,ymin=Onset-OnsetSD,ymax=Onset+OnsetSD), colour = 'black', width = 0.4)+
+  geom_errorbar(data=dfTest, aes(Year,Peak,ymin=Peak-PeakSD,ymax=Peak+PeakSD), colour = 'red', width = 0.4)+
+  geom_errorbar(data=dfTest, aes(Year,End,ymin=End-EndSD,ymax=End+EndSD), colour = 'blue', width = 0.4)+
+  facet_wrap(~SpeciesID,scales = "free_y")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))+
+  ggtitle("Arthropod phenological events from 1996 to 2019")
+p + theme(plot.title = element_text(angle = 360, hjust = 0.5))
+
+
+#3/6/2021
+#df8subGroupBy <- group_by(df8sub, SpeciesID, Year)
+df8sub %>% group_by(SpeciesID, Year) -> df8subGroupBy
+dfTest <- summarise(df8subGroupBy, OnsetSD = sd(Onset), Onset = mean(Onset), PeakSD = sd(Peak), Peak = mean(Peak), EndSD = sd(End), End = mean(End))
+
+dfTestAcari <- subset(dfTest,SpeciesID=="Acari")
 
 # TEST SØRINE
 createPdfForSpecies <- function(data, species){
@@ -626,9 +699,9 @@ createPdfForSpecies <- function(data, species){
     geom_boxplot() + facet_wrap(~Pheno.Event,scales = "free_y") + 
     theme(axis.text.x = element_text(angle = 90, hjust = 0)) + ggtitle(species)
   
-  pdf(paste("Data/OPE_figures_by_species\\",species,".pdf", sep=""),width=10,height=6)
-  print(speciesPlot)
-  dev.off()
+  #pdf(paste("Data/OPE_figures_by_species\\",species,".pdf", sep=""),width=10,height=6)
+  #print(speciesPlot)
+  #dev.off()
 }
 
 for (species in unique(df8sub$SpeciesID)){
@@ -646,6 +719,8 @@ ggplot(data=subset(dfOPE,Pheno.Event=="Peak"),aes(Year,DOY)) + ylab("Day of Year
 ggplot(data=df8sub, aes(Year,Duration)) + ylab("Day of Year") + geom_boxplot() + 
   facet_wrap(~SpeciesID,scales = "free_y") + 
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+
 
 #Her laves et plot for en artsgruppe, så resultaterne kan ses i en figur
 ggplot(data=subset(dfOPE,SpeciesID=="Chironomidae"), aes(as.integer(as.character(Year)),DOY, colour=Pheno.Event))+
