@@ -85,12 +85,18 @@ df1$DOY7<-floor(df1$DOY/7)*7 #Add week column. deler DOY med 7, fjerner decimale
 df1$Month<-month(df1$Date) # Add month variable, men som en factor, altså noget som R kender/kan arbejde med.
 df1$Year<-year(df1$Date) # Add year variable, men som en factor, altså noget som R kender/kan arbejde med.
 
+#df1$Month<- as.factor(as.numeric(df1$Month)) #Numeric funktion inde i factor funktion for at lave måned og år om til tal først.
+#df1$Year<- as.factor(as.numeric(df1$Year))
+
 #Change Days E,F,G,H to zero after 2006 trapdays are recorded, but samples not processed
 #Fra 2006 blev antallet af traps reduceret til 4 fra 8. 
 df1 <- within(df1, DaysE[Year>2006] <- 0)
 df1 <- within(df1, DaysF[Year>2006] <- 0)
 df1 <- within(df1, DaysG[Year>2006] <- 0)
 df1 <- within(df1, DaysH[Year>2006] <- 0)
+
+df1$Month<- as.factor(as.numeric(df1$Month)) #Numeric funktion inde i factor funktion for at lave måned og år om til tal først.
+df1$Year<- as.factor(as.numeric(df1$Year))
 
 #Disse tre kolonner er indlæst som faktorer
 df1$A <- as.numeric(df1$A)
@@ -104,8 +110,8 @@ df1$SpeciesID[is.na(df1$SpeciesID)]<-as.character(df1$Phylum[is.na(df1$SpeciesID
 
 #Adjust taxonomic names.
 sort(unique(df1$SpeciesID))
-df1$SpeciesID[df1$SpeciesID == "Pieridae?"] <- "Pieridae"
-df1$SpeciesID[df1$SpeciesID == "Triopsidae?"] <- "Triopsidae"
+df1$SpeciesID[df1$SpeciesID == "PieridaeÂ"] <- "Pieridae" #Der er et mærkeligt Â ud for disse taxa. Her fjernes det.
+df1$SpeciesID[df1$SpeciesID == "TriopsidaeÂ"] <- "Triopsidae"
 
 #Dennne sum kan godt laves for alle, for at se hvor mange det er man fjerner. (Det har jeg gjort)
 #Virker ikke for mig. Ingen kolonne som hedder abundans.
@@ -136,7 +142,8 @@ length(unique(df1$SpeciesID))#ender op med 69 levels.#Ender med 70. Er der tilf�
 #sort(unique(df1$Year))
 
 #Summarize to one value per SpeciesID,Year,Plot,DOY
-df1%>%group_by(SpeciesID,Year,Plot,Month,DOY)%>%
+df1%>%
+  group_by(SpeciesID,Year,Plot,Month,DOY)%>%
   summarise(DaysA=mean(DaysA),DaysB=mean(DaysB),DaysC=mean(DaysC),DaysD=mean(DaysD),
             DaysE=mean(DaysE),DaysF=mean(DaysF),DaysG=mean(DaysG),DaysH=mean(DaysH),
   A=sum(A),B=sum(B),C=sum(C),D=sum(D),E=sum(E),F=sum(F),G=sum(G),H=sum(H))->df2
@@ -167,6 +174,8 @@ df3$Abundance[is.na(df3$Abundance)] <- 0
 #Kolonne med Event oprettes. Hvis abundansen er mere end 0 skrives 1, ellers 0.
 #Dette for at sige at der er et event.
 df3$Event<-ifelse(df3$Abundance>0,1,0)
+
+df3$Month<- as.numeric(df3$Month)
 
 df3%>%
   subset(Month>5&Month<9)%>% #månderne maj til september
@@ -292,6 +301,8 @@ df3%>%
   ggplot(aes(Year,AbundancePTD)) + ylab("Abundance per trap day") + 
   geom_smooth(method="lm")+geom_point()+facet_wrap(SpeciesID~Plot,scales = "free_y",ncol=6) + 
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+class(df3$Plot)
 
 ####NYT DATASÆT SOM SKAL BRUGES TIL GAM####
 df6 <- data.frame(df3)
@@ -570,6 +581,8 @@ df7include <- subset(df7GAM, Total_GAM >= 5)
 
 ##Laver en fil i en folder med figures for alle 69 species.
 df7$Abundance<- as.numeric(df7$Abundance)
+#class(df7$DOY)
+df7$DOY<- as.numeric(df7$DOY)
 for (k in unique(df7$SpeciesID)){
   dfsub<-subset(df7,SpeciesID==k)
   pdf(paste("Figures",k,".pdf"),width=20,height=12)
@@ -597,6 +610,9 @@ for (k in unique(df7$SpeciesID)){
   }
   dev.off()
 }
+
+warnings()
+
 
 #################################################################
 # Nu skal vi lave fine plots (WORK IN PROGRESS)
