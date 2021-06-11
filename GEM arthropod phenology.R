@@ -1,6 +1,7 @@
 #Alle nedstående er nogle toolboxes der skal installeres og køres inden man begynder at kigge på data.
 #install.packages("RDocumentation")#her er RDocumentation lige instaleret manuelt. Kan også gøre det i Tools.
 library(tidyverse)
+library(tidyr)
 library(RDocumentation)#Denne gør din help() funktion bedre
 library(readxl) #Indlæser excel filer, import into R.
 library(lubridate) #Beregner datoer og tidspunkter. Det er en toolbox, eller en række tools der hjælper med at fremstille tid/datoer bedre. 
@@ -100,8 +101,13 @@ df1$Year<- as.factor(as.numeric(df1$Year))
 
 #Disse tre kolonner er indlæst som faktorer
 df1$A <- as.numeric(df1$A)
+df1$B <- as.numeric(df1$B)
 df1$C <- as.numeric(df1$C)
+df1$D <- as.numeric(df1$D)
 df1$E <- as.numeric(df1$E)
+df1$F <- as.numeric(df1$F)
+df1$G <- as.numeric(df1$G)
+df1$H <- as.numeric(df1$H)
 
 #Combine taxonomic information into one column
 df1$SpeciesID<-as.character(df1$Family)#vi vil helst have familien.
@@ -110,8 +116,9 @@ df1$SpeciesID[is.na(df1$SpeciesID)]<-as.character(df1$Phylum[is.na(df1$SpeciesID
 
 #Adjust taxonomic names.
 sort(unique(df1$SpeciesID))
-df1$SpeciesID[df1$SpeciesID == "PieridaeÂ"] <- "Pieridae" #Der er et mærkeligt Â ud for disse taxa. Her fjernes det.
-df1$SpeciesID[df1$SpeciesID == "TriopsidaeÂ"] <- "Triopsidae"
+df1$SpeciesID[df1$SpeciesID == "PieridaeÂ "] <- "Pieridae" #Der er et mærkeligt Â ud for disse taxa. Her fjernes det.
+df1$SpeciesID[df1$SpeciesID == "TriopsidaeÂ "] <- "Triopsidae"
+
 
 #Dennne sum kan godt laves for alle, for at se hvor mange det er man fjerner. (Det har jeg gjort)
 #Virker ikke for mig. Ingen kolonne som hedder abundans.
@@ -149,6 +156,9 @@ df1%>%
   A=sum(A),B=sum(B),C=sum(C),D=sum(D),E=sum(E),F=sum(F),G=sum(G),H=sum(H))->df2
 #Her laves et nyt datasæt kaldt df2
 
+df2$SpeciesID[df2$SpeciesID == "PieridaeÂ"] <- "Pieridae" #Der er et mærkeligt Â ud for disse taxa. Her fjernes det.
+df2$SpeciesID[df2$SpeciesID == "TriopsidaeÂ"] <- "Triopsidae"
+
 # #Sum of abundance in all traps, ny kolonne. $ betyder at man laver en ny kolonne
 #Lægger tal fra alle traps i et plot sammen.
 df2$Abundance<-df2$A+df2$B+df2$C+df2$D+df2$E+df2$F+df2$G+df2$H
@@ -156,18 +166,49 @@ df2$Trapdays<-df2$DaysA+df2$DaysB+df2$DaysC+df2$DaysD+df2$DaysE+df2$DaysF+df2$Da
 
 #sum(subset(df2,SpeciesID=="Acari")$Abundance)
 
-#Abundans test plots - Family level data
+df2$Abundance <- as.numeric(df2$Abundance)
+
+#Abundans test plots - Family level data. Denne kode giver de forkerte resultater.
+#df2%>%
+ #spread(key=SpeciesID,value=Abundance)%>%
+  #gather(key=SpeciesID,value=Abundance,22:91)%>%
+  #within(Abundance[is.na(Abundance)] <- 0)%>%
+  #spread(key=SpeciesID,value=Abundance)%>%
+  #mutate(ANMU=Muscidae+Anthomyiidae+Anthomyzidae,
+         #CHCE=Chironomidae+Ceratopogonidae,
+         #MYSC=Mycetophilidae+Sciaridae)%>%
+  #select(-c(Muscidae,Anthomyiidae,Anthomyzidae,Chironomidae,Ceratopogonidae,Mycetophilidae,Sciaridae))%>%
+  #gather(key=SpeciesID,value=Abundance,22:87)->df3test
+
+##Funktionen spread() kan ikke aggregere data og derfor skal group_by og summarise funktioner inkorporeres.
 df2%>%
+  group_by(SpeciesID,Year,Plot,Month,DOY,Trapdays)%>%
+  summarise(Abundance = sum(Abundance))%>%
+  within(Abundance[is.na(Abundance)] <- 0)%>%
   spread(key=SpeciesID,value=Abundance)%>%
-  gather(key=SpeciesID,value=Abundance,22:91)%>% #select all variables between x and z
-  within(Abundance[is.na(Abundance)] <- 0)%>% #NA laves til 0?
-  spread(key=SpeciesID,value=Abundance)%>%
-  mutate(ANMU=Muscidae+Anthomyiidae+Anthomyzidae,
-         CHCE=Chironomidae+Ceratopogonidae,
-         MYSC=Mycetophilidae+Sciaridae)%>% #Nogle grupper blev byttet rundt i de første år. Derfor slået sammen for alle år, kan også lade sig gøre fordi det er små grupper.
-  select(-c(Muscidae,Anthomyiidae,Anthomyzidae,Chironomidae,Ceratopogonidae,Mycetophilidae,Sciaridae))%>% #Grupper smides ud.
-  gather(key=SpeciesID,value=Abundance,22:87)->df3
-#help(mutate)
+mutate(ANMU=Muscidae+Anthomyiidae+Anthomyzidae,
+       CHCE=Chironomidae+Ceratopogonidae,
+       MYSC=Mycetophilidae+Sciaridae)%>%
+  select(-c(Muscidae,Anthomyiidae,Anthomyzidae,Chironomidae,Ceratopogonidae,Mycetophilidae,Sciaridae))%>%
+  gather(key=SpeciesID,value=Abundance,6:71)->df3
+
+
+#Stikproever for at tjekke om værdierne i df3 er korrekte
+dfAcari<-subset(df2,SpeciesID=="Acari")
+dfAcari<-subset(dfAcari,Plot=="Art1")
+dfAcari<-subset(dfAcari,Year=="1996")
+#dfAcari<-subset(dfAcari,Month=="6")
+#dfAcari%>%
+  #group_by(DOY)->dfAcari1
+
+dfAcari2<-subset(df3,SpeciesID=="Acari")
+dfAcari2<-subset(dfAcari2,Plot=="Art1")
+dfAcari2<-subset(dfAcari2,Year=="1996")
+
+dfCollembola2<-subset(df3,SpeciesID=="Collembola")
+dfCollembola2<-subset(dfCollembola2,Plot=="Art5")
+dfCollembola2<-subset(dfCollembola2,Year=="1998")
+
 
 #Sørger lige for at fjerne alle NA og erstatter med 0.
 df3$Abundance[is.na(df3$Abundance)] <- 0
@@ -188,7 +229,7 @@ df2a$Include<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2,1,0)#Need at leas
 #I den nye kolonne som hedder Include. Ifelse(test_expression,x,y). Resultater vises som enten 0 (mindre end 500) eller 1 (højere end 500).
 #Der sorteres efter total abundans i df2a som derefter skal overføres til df3.
 #Filter original data for sampling criterias
-df3$Include <- (df2a$Include[match(paste0(df3$SpeciesID,df3$Year,df3$Plot),paste0(df3$SpeciesID,df3$Year,df3$Plot))])#paste betyder at det er kombinationen af variable der skal matche.
+df3$Include <- (df2a$Include[match(paste0(df3$SpeciesID,df3$Year,df3$Plot),paste0(df2a$SpeciesID,df2a$Year,df2a$Plot))])#paste betyder at det er kombinationen af variable der skal matche.
 #Her er lavet en include kolonne i df3 der har resultaterne af include fra df2a.
 #Her er det vigtigt at notere at denne include kommer ved alle de DOY, arter, year, plot hvor der er en include fordi der har været 3 events ÅRLIGT for denne art, plot, og der har været en abundans over 25.
 #df3$Include<-ifelse(df3$TotalAbundanceYear>24&df3$TotalEventsYear>2,1,0)
@@ -314,6 +355,8 @@ df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event)
 
 #Nogle resultater bliver NaN (kan ikke vise tallet) under AbundansPTD
 
+class(df5$Include)
+
 write.csv(df5, file = "Data/Dataset_for_GAM\\EMdata_final.csv", row.names=FALSE)
 #row.names=FALSE fjerne første kolonne, da vi ellers får et problem med en kolonne X.
 
@@ -412,8 +455,8 @@ df7<-read.csv2("Data/Dataset_for_GAM/EMdata_final.csv",sep=",",stringsAsFactors 
 #df5 <- read.csv("EMdata.csv", header = TRUE)
 
 df7$Year<- as.factor(df7$Year)#den var en integer, men det er nemmere at arbejde med den som en faktor.
-df7$SpeciesID<- as.factor(df7$SpeciesID)
-df7$Plot<- as.factor(df7$Plot)
+#df7$SpeciesID<- as.factor(df7$SpeciesID)
+#df7$Plot<- as.factor(df7$Plot)
 
 class(df7$Abundance)
 typeof(df7$Abundance)
@@ -434,6 +477,7 @@ class(df7$Abundance)
 # af dyr i et bestemt plot, år og af en bestemt artsgruppe. Metoden er beskrivet i Sarah Loboda's nye artikel
 ####################
 
+class(df7$Abundance)
 
 #### phenodate --- FUNKTION ####
 phenodate<-function(mod,em.level)
@@ -485,11 +529,12 @@ modpred <- function(SpeciesID, Plot, Year, data = df7)
 print(df7$SpeciesID)
 print(levels(df7$SpeciesID))
 #### EM --- FUNKTION ####
-EM <- sapply(levels(df7$SpeciesID), function(SpeciesID) {
+EM <- sapply(levels(as.factor(df7$SpeciesID)), function(SpeciesID) {
         print(SpeciesID)
-        sapply(levels(df7$Plot), function(Plot) {
+        #print(levels(as.factor(df7$Plot)))
+        sapply(levels(as.factor(df7$Plot)), function(Plot) {
           #print("Plot")
-          sapply(levels(df7$Year), function(Year) {
+          sapply(levels(as.factor(df7$Year)), function(Year) {
             #print("Year")
             ope.liste <- c(modpred(SpeciesID = SpeciesID, Plot = Plot, Year = Year))
             return(ope.liste)
@@ -575,14 +620,16 @@ df7temp%>%
   group_by(SpeciesID, Plot)%>%
   summarise(Total_GAM= sum(Include))->df7GAM
 df7include <- subset(df7GAM, Total_GAM >= 5)
-#>= 10 eller 5 eller?
+#>= 10 eller 5 eller? Der er ingen Total GAM på 10..
 
 #########unique(df7include$SpeciesID)
 
 ##Laver en fil i en folder med figures for alle 69 species.
+##Der benyttes loop 'for' funktion, hvor der også indgår nested loops.
 df7$Abundance<- as.numeric(df7$Abundance)
-#class(df7$DOY)
+class(df7$Abundance)
 df7$DOY<- as.numeric(df7$DOY)
+
 for (k in unique(df7$SpeciesID)){
   dfsub<-subset(df7,SpeciesID==k)
   pdf(paste("Figures",k,".pdf"),width=20,height=12)
@@ -595,7 +642,7 @@ for (k in unique(df7$SpeciesID)){
       sumabund<-sum(dfsuba$Abundance)
       if(threshold <= 2||sumabund<25){ # skip gam if too few data
         plot(dfsuba$DOY,dfsuba$Abundance,type="p",main=j,
-             ylim=c(0,1.05*max(1,max(dfsuba$Abundance))),
+             ylim=c(0,1.05*max(1,max(dfsuba$Abundance,na.rm=TRUE))),
              xlim=c(154,238))#Det er de åbne symboler der ikke når threshold.
       }
       else{
@@ -603,7 +650,7 @@ for (k in unique(df7$SpeciesID)){
         pred <- data.frame(DOY = seq(154,238, by=0.1)) # frame of model predictions: day 154 to 238.
         pred$Abundance <- predict(g, newdata = pred, type ="response") # Get predicted values under new values of avgsr and trapdays.
         plot(pred$DOY,pred$Abundance,type="l",col="black",lwd=1,main=j,
-             ylim=c(0,1.05*max(c(max(pred$Abundance),max(dfsuba$Abundance)))))
+             ylim=c(0,1.05*max(c(max(pred$Abundance,na.rm=TRUE),max(dfsuba$Abundance,na.rm=TRUE)))))
         points(dfsuba$DOY,dfsuba$Abundance,pch=16,cex=1.5)#lukkede symboler der opfylder threshold værdier
       }
     }
@@ -611,7 +658,6 @@ for (k in unique(df7$SpeciesID)){
   dev.off()
 }
 
-warnings()
 
 
 #################################################################
