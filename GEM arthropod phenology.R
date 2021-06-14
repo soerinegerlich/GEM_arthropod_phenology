@@ -26,9 +26,6 @@ df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emerge
 df1 = df1 %>% rename("DaysA"="Days.A", "DaysB"="Days.B", "DaysC"="Days.C", "DaysD"="Days.D", "DaysE"="Days.E", "DaysF"="Days.F", "DaysG"="Days.G", "DaysH"="Days.H")
 df1 = df1 %>% rename("Plot"="Plot.ID", "Date"="ï..Date") #Fejl vises ved Date. 
 #df1 = df1 %>% rename("Plot"="Plot.ID")
-#% betyder at man ændre i tabellen ikke laver en ny baseret på den gamle. Det bliver overskrevet.
-
-#tz(x)<- "Europe/Berlin" #Hvis der er problemer med tidszone
 
 
 #Her skal vi i alle Days kolonnerne erstatte -9999 med NA, dette fordi i vores excel art står der -9999, men de betyder bare at der ikke er noget snow.
@@ -86,9 +83,6 @@ df1$DOY7<-floor(df1$DOY/7)*7 #Add week column. deler DOY med 7, fjerner decimale
 df1$Month<-month(df1$Date) # Add month variable, men som en factor, altså noget som R kender/kan arbejde med.
 df1$Year<-year(df1$Date) # Add year variable, men som en factor, altså noget som R kender/kan arbejde med.
 
-#df1$Month<- as.factor(as.numeric(df1$Month)) #Numeric funktion inde i factor funktion for at lave måned og år om til tal først.
-#df1$Year<- as.factor(as.numeric(df1$Year))
-
 #Change Days E,F,G,H to zero after 2006 trapdays are recorded, but samples not processed
 #Fra 2006 blev antallet af traps reduceret til 4 fra 8. 
 df1 <- within(df1, DaysE[Year>2006] <- 0)
@@ -96,8 +90,6 @@ df1 <- within(df1, DaysF[Year>2006] <- 0)
 df1 <- within(df1, DaysG[Year>2006] <- 0)
 df1 <- within(df1, DaysH[Year>2006] <- 0)
 
-df1$Month<- as.factor(as.numeric(df1$Month)) #Numeric funktion inde i factor funktion for at lave måned og år om til tal først.
-df1$Year<- as.factor(as.numeric(df1$Year))
 
 #Disse tre kolonner er indlæst som faktorer
 df1$A <- as.numeric(df1$A)
@@ -119,20 +111,7 @@ sort(unique(df1$SpeciesID))
 df1$SpeciesID[df1$SpeciesID == "PieridaeÂ "] <- "Pieridae" #Der er et mærkeligt Â ud for disse taxa. Her fjernes det.
 df1$SpeciesID[df1$SpeciesID == "TriopsidaeÂ "] <- "Triopsidae"
 
-
-#Dennne sum kan godt laves for alle, for at se hvor mange det er man fjerner. (Det har jeg gjort)
-#Virker ikke for mig. Ingen kolonne som hedder abundans.
-sum(subset(df1,SpeciesID=="unidentified")$Abundance) #der er 91
-sum(subset(df1,SpeciesID=="Brachycera larvae")$Abundance) #der er 11
-sum(subset(df1,SpeciesID=="Cyclorrhapha larvae")$Abundance) #der er 495
-sum(subset(df1,SpeciesID=="Lepidoptera larvae")$Abundance) #der er 1310
-sum(subset(df1,SpeciesID=="Diptera larvae")$Abundance) #der er 8
-sum(subset(df1,SpeciesID=="Nematocera larvae")$Abundance) #der er 750
-sum(subset(df1,SpeciesID=="Symphyta larvae")$Abundance) #der er 2
-sum(subset(df1,SpeciesID=="Tipulidae larvae")$Abundance) #der er 1
-sum(subset(df1,SpeciesID=="Hymenoptera larvae")$Abundance) #der er 33
-sum(subset(df1,Year=="2010")$Abundance) 
-
+#Fjerner dele af data som ikke kan nøgles til familie niveau
 df1<- subset(df1,SpeciesID!="unidentified")
 df1<- subset(df1,SpeciesID!="Brachycera larvae")
 df1<- subset(df1,SpeciesID!="Cyclorrhapha larvae")
@@ -156,58 +135,59 @@ df1%>%
   A=sum(A),B=sum(B),C=sum(C),D=sum(D),E=sum(E),F=sum(F),G=sum(G),H=sum(H))->df2
 #Her laves et nyt datasæt kaldt df2
 
-df2$SpeciesID[df2$SpeciesID == "PieridaeÂ"] <- "Pieridae" #Der er et mærkeligt Â ud for disse taxa. Her fjernes det.
-df2$SpeciesID[df2$SpeciesID == "TriopsidaeÂ"] <- "Triopsidae"
 
-# #Sum of abundance in all traps, ny kolonne. $ betyder at man laver en ny kolonne
+#Sum of abundance in all traps, ny kolonne. Abundance regnes dog først i koden nedenfor.
 #Lægger tal fra alle traps i et plot sammen.
-df2$Abundance<-df2$A+df2$B+df2$C+df2$D+df2$E+df2$F+df2$G+df2$H
+#df2$Abundance<-df2$A+df2$B+df2$C+df2$D+df2$E+df2$F+df2$G+df2$H
 df2$Trapdays<-df2$DaysA+df2$DaysB+df2$DaysC+df2$DaysD+df2$DaysE+df2$DaysF+df2$DaysG+df2$DaysH
 
 #sum(subset(df2,SpeciesID=="Acari")$Abundance)
 
 df2$Abundance <- as.numeric(df2$Abundance)
 
-#Abundans test plots - Family level data. Denne kode giver de forkerte resultater.
-#df2%>%
- #spread(key=SpeciesID,value=Abundance)%>%
-  #gather(key=SpeciesID,value=Abundance,22:91)%>%
-  #within(Abundance[is.na(Abundance)] <- 0)%>%
-  #spread(key=SpeciesID,value=Abundance)%>%
-  #mutate(ANMU=Muscidae+Anthomyiidae+Anthomyzidae,
-         #CHCE=Chironomidae+Ceratopogonidae,
-         #MYSC=Mycetophilidae+Sciaridae)%>%
-  #select(-c(Muscidae,Anthomyiidae,Anthomyzidae,Chironomidae,Ceratopogonidae,Mycetophilidae,Sciaridae))%>%
-  #gather(key=SpeciesID,value=Abundance,22:87)->df3test
+#Abundans test plots - Family level data. 
 
 ##Funktionen spread() kan ikke aggregere data og derfor skal group_by og summarise funktioner inkorporeres.
+##Andet problem er, at der dannes NA ved alle DOY's hvor der ikke er blevet samlet dyr ind og dette varierer mellem taxa. 
 df2%>%
   group_by(SpeciesID,Year,Plot,Month,DOY,Trapdays)%>%
-  summarise(Abundance = sum(Abundance))%>%
+  summarise(Abundance=A+B+C+D+E+F+G+H)%>%
   within(Abundance[is.na(Abundance)] <- 0)%>%
-  spread(key=SpeciesID,value=Abundance)%>%
-mutate(ANMU=Muscidae+Anthomyiidae+Anthomyzidae,
+  spread(key=SpeciesID,value=Abundance, convert = TRUE)%>%
+  within(Muscidae[is.na(Muscidae)]<- 0)%>%
+  within(Anthomyiidae[is.na(Anthomyiidae)]<- 0)%>%
+  within(Anthomyzidae[is.na(Anthomyzidae)]<- 0)%>%
+  within(Chironomidae[is.na(Chironomidae)]<- 0)%>%
+  within(Ceratopogonidae[is.na(Ceratopogonidae)]<- 0)%>%
+  within(Mycetophilidae[is.na(Mycetophilidae)]<- 0)%>%
+  within(Sciaridae[is.na(Sciaridae)]<- 0)%>%
+  mutate(ANMU=Muscidae+Anthomyiidae+Anthomyzidae,
        CHCE=Chironomidae+Ceratopogonidae,
        MYSC=Mycetophilidae+Sciaridae)%>%
   select(-c(Muscidae,Anthomyiidae,Anthomyzidae,Chironomidae,Ceratopogonidae,Mycetophilidae,Sciaridae))%>%
-  gather(key=SpeciesID,value=Abundance,6:71)->df3
+  gather(key=SpeciesID,value=Abundance,6:71) -> df3
 
 
 #Stikproever for at tjekke om værdierne i df3 er korrekte
 dfAcari<-subset(df2,SpeciesID=="Acari")
 dfAcari<-subset(dfAcari,Plot=="Art1")
 dfAcari<-subset(dfAcari,Year=="1996")
-#dfAcari<-subset(dfAcari,Month=="6")
-#dfAcari%>%
-  #group_by(DOY)->dfAcari1
 
 dfAcari2<-subset(df3,SpeciesID=="Acari")
 dfAcari2<-subset(dfAcari2,Plot=="Art1")
 dfAcari2<-subset(dfAcari2,Year=="1996")
 
-dfCollembola2<-subset(df3,SpeciesID=="Collembola")
-dfCollembola2<-subset(dfCollembola2,Plot=="Art5")
-dfCollembola2<-subset(dfCollembola2,Year=="1998")
+dfAnthomyiidae2<-subset(df2,SpeciesID=="Anthomyiidae")
+dfAnthomyiidae2<-subset(dfAnthomyiidae2,Plot=="Art5")
+dfAnthomyiidae2<-subset(dfAnthomyiidae2,Year=="2002")
+
+dfAgromyzidae2<-subset(df2,SpeciesID=="Agromyzidae")
+dfAgromyzidae2<-subset(dfAgromyzidae2,Plot=="Art5")
+dfAgromyzidae2<-subset(dfAgromyzidae2,Year=="2002")
+
+dfCHCE2<-subset(df3,SpeciesID=="CHCE")
+dfCHCE2<-subset(dfCHCE2,Plot=="Art1")
+dfCHCE2<-subset(dfCHCE2,Year=="1997")
 
 
 #Sørger lige for at fjerne alle NA og erstatter med 0.
@@ -238,112 +218,6 @@ df3$Include <- (df2a$Include[match(paste0(df3$SpeciesID,df3$Year,df3$Plot),paste
 df4 <-df3 %>% 
   select(SpeciesID, everything())
 
-#Trapdays
-df3%>%
-  #subset(Month>5&Month<9)%>%
-  group_by(SpeciesID, Plot, Year, DOY)%>%
-  summarise(TrapdaysA=mean(DaysA),
-            TrapdaysB=mean(DaysB),
-            TrapdaysC=mean(DaysC),
-            TrapdaysD=mean(DaysD),
-            TrapdaysE=mean(DaysE),
-            TrapdaysF=mean(DaysF),
-            TrapdaysG=mean(DaysG),
-            TrapdaysH=mean(DaysH),
-            Trapdays=mean(Trapdays))%>%
-  group_by(Plot,Year,DOY)%>%
-  summarise(Trapdays=mean(Trapdays,na.rm=T))%>%
-  ggplot(aes(DOY,Trapdays,colour=Plot)) + ylab("Trap days") + 
-  geom_point() + facet_grid(Plot~Year,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-#Trapdays
-df3%>%
-  #subset(Month>5&Month<9&Include==1&Plot!="Art6")%>%
-  subset(Plot!="Art6"&Month>5&Month<9)%>%
-  group_by(Plot,Year,DOY)%>%
-  summarise(Trapdays=mean(Trapdays))%>%
-  group_by(Plot,Year)%>%
-  summarise(Trapdays=sum(Trapdays))%>%
-  ggplot(aes(Year,Trapdays)) + ylab("Trap days") + 
-  geom_point()+facet_grid(~Plot,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-#Abundance
-df3%>%
-  #subset(Month>5&Month<9&Plot!="Art6"&SpeciesID=="Anthomyiidae")%>%
-  #subset(Month>5&Month<9&Include==1&Plot!="Art6"&SpeciesID=="Anthomyzidae")%>%
-  #subset(Month>5&Month<9&Include==1&Plot!="Art6"&SpeciesID=="Agromyzidae")%>%
-  subset(Month>5&Month<9&Include==1&Plot!="Art6"&SpeciesID=="ANMU")%>%
-  group_by(Plot, Year, DOY)%>%
-  summarise(Abundance = sum(Abundance),
-            AbundanceA=sum(A),
-            AbundanceB=sum(B),
-            AbundanceC=sum(C),
-            AbundanceD=sum(D),
-            AbundanceE=sum(E),
-            AbundanceF=sum(F),
-            AbundanceG=sum(G),
-            AbundanceH=sum(H),
-            Trapdays=mean(Trapdays))%>%
-  group_by(Plot,Year,DOY)%>%
-  summarise(Abundance=sum(Abundance,na.rm=T))%>%
-  ggplot(aes(DOY,Abundance)) + ylab("Abundance") + 
-  geom_line() + facet_grid(Plot~Year,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-#Abundance
-df3%>%
-  subset(Month>5&Month<9&Include==1&Plot!="Art6")%>%
-  group_by(SpeciesID,Plot,Year)%>%
-  summarise(Abundance = sum(Abundance),
-            Trapdays=sum(Trapdays),
-            AbundancePTD=Abundance/Trapdays)%>%
-  ggplot(aes(Year,Abundance)) + ylab("Abundance") + 
-  geom_smooth(method="lm")+geom_point()+facet_grid(Plot~SpeciesID,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-#AbundancePTD
-df3%>%
-  subset(Month>5&Month<9&Include==1&Plot!="Art6")%>%
-  group_by(SpeciesID,Plot,Year)%>%
-  summarise(Abundance = sum(Abundance),
-            Trapdays=sum(Trapdays),
-            AbundancePTD=Abundance/Trapdays)%>% #Udregner abundance per trap day for at kontrollere for trapping effort.
-  ggplot(aes(Year,AbundancePTD)) + ylab("Abundance per trap day") + 
-  geom_smooth(method="lm")+geom_point()+facet_grid(Plot~SpeciesID,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-#AbundancePTD plots as colours
-df3%>%
-  subset(Month>5&Month<9&Include==1&Plot!="Art6")%>%
-  group_by(SpeciesID,Plot,Year)%>%
-  summarise(Abundance = sum(Abundance),
-            Trapdays=sum(Trapdays),
-            AbundancePTD=Abundance/Trapdays)%>%
-  ggplot(aes(Year,AbundancePTD,colour=Plot)) + ylab("Abundance per trap day") + 
-  #geom_smooth(method="lm")+
-  geom_line()+facet_wrap(~SpeciesID,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-#AbundancePTD - single groups
-df3%>%
-  #subset(Month>5&Month<9&Include==1&Plot!="Art6"&SpeciesID=="Noctuidae")%>%
-  #subset(Month>5&Month<9&Include==1&Plot!="Art6"&SpeciesID=="Syrphidae")%>%
-  #subset(Month>5&Month<9&Include==1&Plot!="Art6"&SpeciesID=="Linyphiidae")%>%
-  #subset(Month>5&Month<9&Include==1&Plot!="Art6"&SpeciesID=="Thomisidae")%>%
-  subset(Month>5&Month<9&Include==1&Plot!="Art6"&(SpeciesID=="MYSC"|SpeciesID=="Acari"))%>%
-  #subset(Month>5&Month<9&Include==1&Plot!="Art6"&SpeciesID=="CHCE")%>%
-  #subset(Month>5&Month<9&Include==1&Plot!="Art6"&SpeciesID=="MYSC")%>%
-  group_by(SpeciesID,Plot,Year)%>%
-  summarise(Abundance = sum(Abundance),
-            Trapdays=sum(Trapdays),
-            AbundancePTD=Abundance/Trapdays)%>%
-  ggplot(aes(Year,AbundancePTD)) + ylab("Abundance per trap day") + 
-  geom_smooth(method="lm")+geom_point()+facet_wrap(SpeciesID~Plot,scales = "free_y",ncol=6) + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-class(df3$Plot)
 
 ####NYT DATASÆT SOM SKAL BRUGES TIL GAM####
 df6 <- data.frame(df3)
@@ -359,85 +233,6 @@ class(df5$Include)
 
 write.csv(df5, file = "Data/Dataset_for_GAM\\EMdata_final.csv", row.names=FALSE)
 #row.names=FALSE fjerne første kolonne, da vi ellers får et problem med en kolonne X.
-
-#Crosscorrelations between plots
-df3%>%
-  subset(Month>5&Month<9&Include==1)%>% #månederne maj - september med abundans over 500
-  subset(Plot=="Art5"|Plot=="Art7")%>% #sammenlægger plot Art5 og Art7
-  group_by(SpeciesID,Year)%>%
-  summarise(AbundancePTD=log(sum(Abundance)+1)/sum(Trapdays))%>% #udregner PTD
-  spread(key=SpeciesID,value=AbundancePTD)%>% #Hver kolonne viser familie og under disse abundansPTD
-  within(rm(Year))->corrdata1 #rm betyder remove object
-
-df3%>%
-  subset(Month>5&Month<9&Include==1)%>%
-  subset(Plot=="Art3"|Plot=="Art4")%>%
-  group_by(SpeciesID,Year)%>%
-  summarise(AbundancePTD=log(sum(Abundance)+1)/sum(Trapdays))%>%
-  spread(key=SpeciesID,value=AbundancePTD)%>%
-  within(rm(Year))->corrdata2
-
-df3%>%
-  subset(Month>5&Month<9&Include==1)%>%
-  subset(Plot=="Art2")%>%
-  group_by(SpeciesID,Year)%>%
-  summarise(AbundancePTD=log(sum(Abundance)+1)/sum(Trapdays))%>%
-  spread(key=SpeciesID,value=AbundancePTD)%>%
-  within(rm(Year))->corrdata3
-
-df3%>%
-  subset(Month>5&Month<9&Include==1)%>%
-  subset(Plot=="Art1")%>%
-  group_by(SpeciesID,Year)%>%
-  summarise(AbundancePTD=log(sum(Abundance)+1)/sum(Trapdays))%>%
-  spread(key=SpeciesID,value=AbundancePTD)%>%
-  within(rm(Year))->corrdata4
-
-M1<-cor(corrdata1,use="pairwise.complete.obs")
-res1 <- cor.mtest(corrdata1, conf.level = .95,method="spearman")
-
-M2<-cor(corrdata2,use="pairwise.complete.obs")
-res2 <- cor.mtest(corrdata2, conf.level = .95,method="spearman")
-
-M3<-cor(corrdata3,use="pairwise.complete.obs")
-res3 <- cor.mtest(corrdata3, conf.level = .95,method="spearman")
-
-M4<-cor(corrdata4,use="pairwise.complete.obs")
-res4 <- cor.mtest(corrdata4, conf.level = .95,method="spearman")
-
-par(mfrow=c(2,2),oma = c(5,2,2,5) + 0.1,mar = c(0,0,0,0) ) 
-corrplot(M1, method="ellipse",type="lower",diag=FALSE,outline="black",p.mat = res1$p, 
-         sig.level = 0.05,tl.col="black",tl.cex=1,cl.cex=1,addgrid.col=NA,mar=c(0.5,0.5,0.5,0.5))
-
-corrplot(M2, method="ellipse",type="lower",diag=FALSE,outline="black",p.mat = res2$p, 
-         sig.level = 0.05,tl.col="black",tl.cex=1,cl.cex=1,addgrid.col=NA,mar=c(0.5,0.5,0.5,0.5))
-
-corrplot(M3, method="ellipse",type="lower",diag=FALSE,outline="black",p.mat = res3$p, 
-         sig.level = 0.05,tl.col="black",tl.cex=1,cl.cex=1,addgrid.col=NA,mar=c(0.5,0.5,0.5,0.5))
-
-corrplot(M4, method="ellipse",type="lower",diag=FALSE,outline="black",p.mat = res4$p, 
-         sig.level = 0.05,tl.col="black",tl.cex=1,cl.cex=1,addgrid.col=NA,mar=c(0.5,0.5,0.5,0.5))
-
-  corrdata1%>%
-  ggplot(aes(CHCE,Linyphiidae)) + geom_smooth(method="lm")+geom_point()
-
-plot.new(); dev.off()
-dftest<-subset(df1,SpeciesID=="Muscidae"&Year==1996)
-
-ggplot(data=dftest, aes(DOY,Abundance, colour=Plot)) + ylab("Abundance") + 
-  geom_point() + facet_wrap(~Plot,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-ggplot(data=subset(df3,SpeciesID=="Chironomidae"&Plot!="Art6"), aes(as.numeric(as.character(Year)),AbundancePTD, colour=Plot)) + ylab("Abundance") + 
-  geom_point() + geom_smooth(method="lm")+facet_wrap(~Plot,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-ggplot(data=subset(df3,SpeciesID=="Muscidae"&Plot!="Art6"), aes(as.numeric(as.character(Year)),AbundancePTD, colour=Plot)) + ylab("Abundance") + 
-  geom_point() + geom_smooth(method="lm")+facet_wrap(~Plot,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-df1%>%subset(Year==2017&Plot=="Art2"&SpeciesID=="Muscidae")->dftest
-head(dftest)
 
 
 ############################################################
@@ -470,6 +265,58 @@ class(df7$Abundance)
 #class(df7$AbundancePTD)
 #df7$AbundancePTD<-as.numeric(df7$AbundancePTD)
 #class(df7$AbundancePTD)
+
+#Her indlæses filer med data der skal testes.
+df7<-read.csv2("Data/Dataset_for_GAM/EMdata_final.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
+#df5<- read.csv("ZAC_all.csv")
+df7$Year<- as.factor(df7$Year)
+
+#Nu skal filerne TESTES - Der er blevet lavet en loop der indsætter alle SpeciesID i en fil. (df7)
+df7%>%
+  group_by(SpeciesID, Plot, Year)%>%
+  summarise(Include= max(Include))->df7temp
+df7temp%>%
+  group_by(SpeciesID, Plot)%>%
+  summarise(Total_GAM= sum(Include))->df7GAM
+df7include <- subset(df7GAM, Total_GAM >= 5)
+#>= 10 eller 5 eller? Der er ingen Total GAM på 10..
+
+#########unique(df7include$SpeciesID)
+
+##Laver en fil i en folder med figures for alle 69 species.
+##Der benyttes loop 'for' funktion, hvor der også indgår nested loops.
+df7$Abundance<- as.numeric(df7$Abundance)
+class(df7$Abundance)
+df7$DOY<- as.numeric(df7$DOY)
+
+for (k in unique(df7$SpeciesID)){
+  dfsub<-subset(df7,SpeciesID==k)
+  pdf(paste("Figures",k,".pdf"),width=20,height=12)
+  par(mfrow=c(7,23),oma = c(5,5,4,0) ,mar = c(2,1,2,2) + 0.1) #it goes c(bottom, left, top, right) 
+  for (i in unique(dfsub$Plot)){
+    for(j in unique(dfsub$Year)){
+      dfsuba<-subset(dfsub,Plot==i)
+      dfsuba<-subset(dfsuba,Year==j)
+      threshold <- length(dfsuba[dfsuba$Abundance >= 1, 1]) # beregne antal events
+      sumabund<-sum(dfsuba$Abundance)
+      if(threshold <= 2||sumabund<25){ # skip gam if too few data
+        plot(dfsuba$DOY,dfsuba$Abundance,type="p",main=j,
+             ylim=c(0,1.05*max(1,max(dfsuba$Abundance,na.rm=TRUE))),
+             xlim=c(154,238))#Det er de åbne symboler der ikke når threshold.
+      }
+      else{
+        g <- gam(round(Abundance,0)~s(DOY, k=4),family=poisson(link = "log"),data=dfsuba)
+        pred <- data.frame(DOY = seq(154,238, by=0.1)) # frame of model predictions: day 154 to 238.
+        pred$Abundance <- predict(g, newdata = pred, type ="response") # Get predicted values under new values of avgsr and trapdays.
+        plot(pred$DOY,pred$Abundance,type="l",col="black",lwd=1,main=j,
+             ylim=c(0,1.05*max(c(max(pred$Abundance,na.rm=TRUE),max(dfsuba$Abundance,na.rm=TRUE)))))
+        points(dfsuba$DOY,dfsuba$Abundance,pch=16,cex=1.5)#lukkede symboler der opfylder threshold værdier
+      }
+    }
+  }
+  dev.off()
+}
+
 
 ####################
 # Herunder er fire funktioner (phenodate,phenogam,modpred,EM), der udfører trin i beregningen af
@@ -560,9 +407,9 @@ dfOPE <- gather(dfEM,key=SpeciesID,value=DOY,1:69,-Year,-Plot,-Pheno.Event)
 #length(dfEM). For at finde ud af længden af datasættet. Det er 69.
 #OPE = Onset, Peak, End
 #write.csv(df5, file = "Data/Dataset_for_GAM\\EMdata_final.csv", row.names=FALSE)
-write.csv(dfOPE, file = "Data/Dataset_for_GAM\\dfOPE_dataframe.csv", row.names=FALSE)
+write.csv(dfOPE, file = "Data/Dataset_for_GAM_NEW\\dfOPE_dataframe.csv", row.names=FALSE)
 #write.table(dfOPE, file = "OPE_liste.txt", sep = "\t")
-dfOPE<-read.csv2("Data/Dataset_for_GAM/dfOPE_dataframe.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
+dfOPE<-read.csv2("Data/Dataset_for_GAM_NEW/dfOPE_dataframe.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
 #Denne fil er nu noget der skal bruges til nogen ggplots
 
 #Der skal lige laves en ekstra tabel med minimum, gennemsnitlig og maximum pheno.events per art per plot.
@@ -575,16 +422,23 @@ class(dfOPEsub$DOY)
 dfOPEsub%>%
   group_by(SpeciesID,Plot,Pheno.Event)%>%
   summarise(MinDOY= min(DOY), MeanDOY= mean(DOY),MaxDOY = max(DOY))->dfOPEsub
-write.table(dfOPEsub, file="Data/Dataset_for_GAM\\OPE_mmm.txt",sep = "\t")
+write.table(dfOPEsub, file="Data/Dataset_for_GAM_NEW\\OPE_mmm.txt",sep = "\t")
 
+sort(unique(dfOPE$SpeciesID))
 
 #Her har JEG lavet kolonner fra Onset, Peak, og Event.
 #Har også lavet en kolonne der udregner duration, derefter omarrangeret kolonnerne.
 df8 <- dfOPE %>% 
   spread(Pheno.Event, DOY)
+#Tjek data:
+dfAcari3<-subset(dfOPE,SpeciesID=="Acari")
+dfAcari3<-subset(dfAcari3,Plot=="Art2")
+dfAcari3<-subset(dfAcari3,Year=="1997")
 class(dfOPE$End)
 df8$End<-as.numeric(df8$End)
 df8$Onset<-as.numeric(df8$Onset)
+df8$Peak<-as.numeric(df8$Peak)
+
 df8$Duration <- (df8$End - df8$Onset)
 df8 <- df8 %>% 
   select(Year, Plot, SpeciesID, Onset, Peak, End, Duration)
@@ -593,9 +447,9 @@ df8$Year<- as.factor(df8$Year)
 df8sub$Year<- as.factor(df8sub$Year)
 #Her husker man at lave year om til en faktor, hvis nu df8 el. df8sub skal bruges til udregninger.
 
-write.csv(df8, file="Data/Dataset_for_GAM\\duration.csv", row.names = FALSE)
-write.csv(df8sub, file="Data/Dataset_for_GAM\\duration_subset.csv",row.names = FALSE)
-write.table(df8sub, file="Data/Dataset_for_GAM\\duration_subset.txt",sep ="\t",row.names = FALSE)
+write.csv(df8, file="Data/Dataset_for_GAM_NEW\\duration.csv", row.names = FALSE)
+write.csv(df8sub, file="Data/Dataset_for_GAM_NEW\\duration_subset.csv",row.names = FALSE)
+write.table(df8sub, file="Data/Dataset_for_GAM_NEW\\duration_subset.txt",sep ="\t",row.names = FALSE)
 #Her laver jeg lige filer af df8 og df8sub, så behøves jeg bare læse dem.
 
 
@@ -607,187 +461,19 @@ write.table(df8sub, file="Data/Dataset_for_GAM\\duration_subset.txt",sep ="\t",r
 ############################################################
 
 
-#Her indlæses filer med data der skal testes.
-df7<-read.csv2("Data/Dataset_for_GAM/EMdata_final.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
-#df5<- read.csv("ZAC_all.csv")
-df7$Year<- as.factor(df7$Year)
-
-#Nu skal filerne TESTES - Der er blevet lavet en loop der indsætter alle SpeciesID i en fil. (df7)
-df7%>%
-  group_by(SpeciesID, Plot, Year)%>%
-  summarise(Include= max(Include))->df7temp
-df7temp%>%
-  group_by(SpeciesID, Plot)%>%
-  summarise(Total_GAM= sum(Include))->df7GAM
-df7include <- subset(df7GAM, Total_GAM >= 5)
-#>= 10 eller 5 eller? Der er ingen Total GAM på 10..
-
-#########unique(df7include$SpeciesID)
-
-##Laver en fil i en folder med figures for alle 69 species.
-##Der benyttes loop 'for' funktion, hvor der også indgår nested loops.
-df7$Abundance<- as.numeric(df7$Abundance)
-class(df7$Abundance)
-df7$DOY<- as.numeric(df7$DOY)
-
-for (k in unique(df7$SpeciesID)){
-  dfsub<-subset(df7,SpeciesID==k)
-  pdf(paste("Figures",k,".pdf"),width=20,height=12)
-  par(mfrow=c(7,22),oma = c(5,5,4,0) ,mar = c(2,1,2,2) + 0.1) #it goes c(bottom, left, top, right) 
-  for (i in unique(dfsub$Plot)){
-    for(j in unique(dfsub$Year)){
-      dfsuba<-subset(dfsub,Plot==i)
-      dfsuba<-subset(dfsuba,Year==j)
-      threshold <- length(dfsuba[dfsuba$Abundance >= 1, 1]) # beregne antal events
-      sumabund<-sum(dfsuba$Abundance)
-      if(threshold <= 2||sumabund<25){ # skip gam if too few data
-        plot(dfsuba$DOY,dfsuba$Abundance,type="p",main=j,
-             ylim=c(0,1.05*max(1,max(dfsuba$Abundance,na.rm=TRUE))),
-             xlim=c(154,238))#Det er de åbne symboler der ikke når threshold.
-      }
-      else{
-        g <- gam(round(Abundance,0)~s(DOY, k=4),family=poisson(link = "log"),data=dfsuba)
-        pred <- data.frame(DOY = seq(154,238, by=0.1)) # frame of model predictions: day 154 to 238.
-        pred$Abundance <- predict(g, newdata = pred, type ="response") # Get predicted values under new values of avgsr and trapdays.
-        plot(pred$DOY,pred$Abundance,type="l",col="black",lwd=1,main=j,
-             ylim=c(0,1.05*max(c(max(pred$Abundance,na.rm=TRUE),max(dfsuba$Abundance,na.rm=TRUE)))))
-        points(dfsuba$DOY,dfsuba$Abundance,pch=16,cex=1.5)#lukkede symboler der opfylder threshold værdier
-      }
-    }
-  }
-  dev.off()
-}
-
-
-
 #################################################################
 # Nu skal vi lave fine plots (WORK IN PROGRESS)
 #################################################################
 
 #Her indlæses filer med data der er blevet testet og nu skal der arbejdes videre
-dfOPE <- read.csv("Data/Dataset_for_GAM/dfOPE_dataframe.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
+dfOPE <- read.csv("Data/Dataset_for_GAM_NEW/dfOPE_dataframe.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
 dfOPE$Year<- as.factor(dfOPE$Year)
-df8 <- read.csv("Data/Dataset_for_GAM\\duration.csv", sep=",",stringsAsFactors = FALSE, header = TRUE)
+df8 <- read.csv("Data/Dataset_for_GAM_NEW\\duration.csv", sep=",",stringsAsFactors = FALSE, header = TRUE)
 df8$Year<- as.factor(df8$Year)
-df8sub <- read.csv2("Data/Dataset_for_GAM\\duration_subset.txt",  sep="\t",stringsAsFactors = FALSE, header = TRUE)
+df8sub <- read.csv2("Data/Dataset_for_GAM_NEW\\duration_subset.txt",  sep="\t",stringsAsFactors = FALSE, header = TRUE)
 df8sub$Year<- as.factor(df8sub$Year)
 
 head(dfOPE)
 
-#Boxplot af fænologivariable
-ggplot(data=dfOPE, aes(Year,DOY, colour=Pheno.Event)) + ylab("Day of Year") + 
-  geom_boxplot() + facet_wrap(~Pheno.Event,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
+####SE I SCRIPT 'DATA FOR PLOTS'####
 
-class(dfOPE$DOY)
-
-#ggplot(data=dfOPE, aes(Year,DOY, colour=Pheno.Event)) + ylab("Day of Year") + 
-  #geom_point(data=dfOPE,aes(Year,DOY)) + geom_point(data=dfOPE,aes(Year,mean(dfOPE$DOY)))+geom_errorbar(data=dfOPE,mean(dfOPE$DOY),ymin=mean(dfOPE$DOY)-sd(dfOPE$DOY),ymax=mean(dfOPE$DOY)-sd(dfOPE$DOY)) + facet_wrap(~Pheno.Event,scales = "free_y") + 
-  #theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-####FIGUR FOR ACARI####
-df8sub %>% group_by(SpeciesID, Year) -> df8subGroupBy
-
-dfTestAcari1 <- subset(df8subGroupBy,SpeciesID=="Acari")
-
-
-ggplot(data=dfTestAcari1, aes(Year,Onset)) + 
-  ylab("Day of Year")+ 
-  geom_point(shape = 1,size=2)+
-  geom_point(data=dfTestAcari1, aes(Year,Peak), shape = 2,size=2)+
-  geom_point(data=dfTestAcari1, aes(Year,End),shape = 0,size=2)+
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-
-ggplot(data=df8sub, aes(Year,Onset)) + 
-  ylab("Day of Year")+ 
-  geom_point(shape = 1,size=2)+
-  geom_point(data=df8sub, aes(Year,Peak), shape = 2,size=2)+
-  geom_point(data=df8sub, aes(Year,End),shape = 0,size=2)+
-  facet_wrap(~SpeciesID,scales = "free_y")+
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-
-####FIGUR FOR ACARI MED MEAN PLOT####
-ggplot(data=dfTestAcari, aes(Year,Onset)) + 
-  ylab("Day of Year") + 
-  geom_point() + 
-  #geom_errorbar(
-    #data=dfOPE2,
-    #aes(
-     # mean(DOY),
-      #ymin=mean(DOY)-sd(DOY),
-      #ymax=mean(DOY)-sd(DOY)))+
-  geom_point(data=dfTestAcari, aes(Year,Peak),colour='red',size=1.5)+
-  geom_point(data=dfTestAcari, aes(Year,End),colour='blue',size=1.5)+
-  geom_errorbar(data=dfTestAcari, aes(Year,Onset,ymin=Onset-OnsetSD,ymax=Onset+OnsetSD), colour = 'black', width = 0.4)+
-  geom_errorbar(data=dfTestAcari, aes(Year,Peak,ymin=Peak-PeakSD,ymax=Peak+PeakSD), colour = 'red', width = 0.4)+
-  geom_errorbar(data=dfTestAcari, aes(Year,End,ymin=End-EndSD,ymax=End+EndSD), colour = 'blue', width = 0.4)+
-   theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-
-p <- ggplot(data=dfTest, aes(Year,Onset)) + 
-  ylab("Day of Year") + 
-  geom_point() + 
-  #geom_errorbar(
-  #data=dfOPE2,
-  #aes(
-  # mean(DOY),
-  #ymin=mean(DOY)-sd(DOY),
-  #ymax=mean(DOY)-sd(DOY)))+
-  geom_point(data=dfTest, aes(Year,Peak),colour='red',size=1.5)+
-  geom_point(data=dfTest, aes(Year,End),colour='blue',size=1.5)+
-  geom_errorbar(data=dfTest, aes(Year,Onset,ymin=Onset-OnsetSD,ymax=Onset+OnsetSD), colour = 'black', width = 0.4)+
-  geom_errorbar(data=dfTest, aes(Year,Peak,ymin=Peak-PeakSD,ymax=Peak+PeakSD), colour = 'red', width = 0.4)+
-  geom_errorbar(data=dfTest, aes(Year,End,ymin=End-EndSD,ymax=End+EndSD), colour = 'blue', width = 0.4)+
-  facet_wrap(~SpeciesID,scales = "free_y")+
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))+
-  ggtitle("Arthropod phenological events from 1996 to 2019")
-p + theme(plot.title = element_text(angle = 360, hjust = 0.5))
-
-
-#3/6/2021
-#df8subGroupBy <- group_by(df8sub, SpeciesID, Year)
-df8sub %>% group_by(SpeciesID, Year) -> df8subGroupBy
-dfTest <- summarise(df8subGroupBy, OnsetSD = sd(Onset), Onset = mean(Onset), PeakSD = sd(Peak), Peak = mean(Peak), EndSD = sd(End), End = mean(End))
-
-dfTestAcari <- subset(dfTest,SpeciesID=="Acari")
-
-# TEST SØRINE
-createPdfForSpecies <- function(data, species){
-  dataBySpecies <- subset(data,SpeciesID==species)
-  
-  speciesPlot <- ggplot(data=dataBySpecies, aes(Year,DOY, colour=Pheno.Event)) + ylab("Day of Year") + 
-    geom_boxplot() + facet_wrap(~Pheno.Event,scales = "free_y") + 
-    theme(axis.text.x = element_text(angle = 90, hjust = 0)) + ggtitle(species)
-  
-  #pdf(paste("Data/OPE_figures_by_species\\",species,".pdf", sep=""),width=10,height=6)
-  #print(speciesPlot)
-  #dev.off()
-}
-
-for (species in unique(df8sub$SpeciesID)){
-  print(species)
-  createPdfForSpecies(dfOPE, species)
-}
-
-
-# TEST SØRINE END
-
-ggplot(data=subset(dfOPE,Pheno.Event=="Peak"),aes(Year,DOY)) + ylab("Day of Year") + geom_boxplot() + 
-  facet_wrap(~SpeciesID,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-ggplot(data=df8sub, aes(Year,Duration)) + ylab("Day of Year") + geom_boxplot() + 
-  facet_wrap(~SpeciesID,scales = "free_y") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-
-
-#Her laves et plot for en artsgruppe, så resultaterne kan ses i en figur
-ggplot(data=subset(dfOPE,SpeciesID=="Chironomidae"), aes(as.integer(as.character(Year)),DOY, colour=Pheno.Event))+
-  geom_line()+geom_point()+ylab("Day of year")+facet_grid(SpeciesID~Plot,scales = "free_y")+theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
-#Her er samme type plot, blot for en anden artsgruppe
-ggplot(data=subset(dfOPE,SpeciesID=="Muscidae"&Pheno.Event=="Peak"), aes(as.integer(as.character(Year)),DOY, colour=Plot))+
-  geom_line()+geom_point()+ylab("Day of year")+facet_grid(~SpeciesID,scales = "free_y")+theme(axis.text.x = element_text(angle = 90, hjust = 0))
