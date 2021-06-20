@@ -143,8 +143,6 @@ df2$Trapdays<-df2$DaysA+df2$DaysB+df2$DaysC+df2$DaysD+df2$DaysE+df2$DaysF+df2$Da
 
 #sum(subset(df2,SpeciesID=="Acari")$Abundance)
 
-df2$Abundance <- as.numeric(df2$Abundance)
-
 #Abundans test plots - Family level data. 
 
 ##Funktionen spread() kan ikke aggregere data og derfor skal group_by og summarise funktioner inkorporeres.
@@ -181,9 +179,9 @@ dfAnthomyiidae2<-subset(df2,SpeciesID=="Anthomyiidae")
 dfAnthomyiidae2<-subset(dfAnthomyiidae2,Plot=="Art5")
 dfAnthomyiidae2<-subset(dfAnthomyiidae2,Year=="2002")
 
-dfAgromyzidae2<-subset(df2,SpeciesID=="Agromyzidae")
-dfAgromyzidae2<-subset(dfAgromyzidae2,Plot=="Art5")
-dfAgromyzidae2<-subset(dfAgromyzidae2,Year=="2002")
+dfAgromyzidae2<-subset(df3,SpeciesID=="Agromyzidae")
+dfAgromyzidae2<-subset(dfAgromyzidae2,Plot=="Art1")
+dfAgromyzidae2<-subset(dfAgromyzidae2,Year=="2005")
 
 dfCHCE2<-subset(df3,SpeciesID=="CHCE")
 dfCHCE2<-subset(dfCHCE2,Plot=="Art1")
@@ -203,7 +201,55 @@ df3%>%
   group_by(SpeciesID,Plot,Year)%>%
   summarise(TotalAbundance=sum(Abundance),TotalEvents=sum(Event))->df2a
 
-df2a$Include<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2,1,0)#Need at least ? individuals in a season and 3 capture events
+#Vi vil gerne sortere taxa fra, hvor der kun er data for <5 år
+df2a$EmergYear<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2,1,0)
+
+df2a%>%
+  group_by(SpeciesID,Year)%>%
+  summarise(TotalYear=sum(EmergYear))->df3a
+
+#Tjek
+dfCecidomyiidaea<-subset(df3a,SpeciesID=="Cecidomyiidae")
+dfAcari3a<-subset(dfAcari3a,Plot=="Art1")
+dfAcari3a<-subset(dfAcari3a,Year=="1996")
+
+#Overføre TotalYear kolonne til df2a
+df2a$TotalYear <- (df3a$TotalYear[match(paste0(df2a$SpeciesID,df2a$Year),paste0(df3a$SpeciesID,df3a$Year))])
+df3$EmergYear <- (df2a$EmergYear[match(paste0(df3$SpeciesID,df3$Year),paste0(df2a$SpeciesID,df2a$Year))])
+df3$TotalYear <- (df2a$TotalYear[match(paste0(df3$SpeciesID,df3$Year),paste0(df2a$SpeciesID,df2a$Year))])
+
+df3$YearThres<-ifelse(df3$TotalYear>0,1,0)
+df3$Include2<-0
+
+#speciesId = 'Acari'
+for (speciesId in unique(df3$SpeciesID)){
+  dfsub<-subset(df3,SpeciesID==speciesId)
+  
+  yearsThatHaveYearThresValueOf1 = 0
+  
+  for (year in unique(dfsub$Year)){
+    dfsub1<-subset(dfsub,Year==year)
+    
+    if (length(unique(dfsub1$YearThres)) > 1) {
+      print(paste('ERROR:', 'year', year, 'of species', speciesId, 'has different YearThres values'))
+    }
+    
+    if (dfsub1$YearThres[1] == 1) {
+      yearsThatHaveYearThresValueOf1 = yearsThatHaveYearThresValueOf1 + 1
+    }
+  }
+  
+  if (yearsThatHaveYearThresValueOf1 >= 5) {
+    for (i in 1:nrow(df3)) {
+      if (df3$SpeciesID[i] == speciesId) {
+        df3$Include2[i]<-1
+      }
+    }
+  }
+}
+
+#Tilføjer Include kolonne, hvor alle 3 betingelser angives til at være opfyldt eller ikke
+df2a$Include<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2&df2a$TotalYear>0,1,0)#Need at least ? individuals in a season and 3 capture events
 #mindst 25 individer, indsamlet mindst 3 gange. På et enket år for en enkel art og plot.
 #df2a$Include<-ifelse(df2a$TotalAbundance<500,0,1)#Need at least 100 individuals across years per plot 
 #I den nye kolonne som hedder Include. Ifelse(test_expression,x,y). Resultater vises som enten 0 (mindre end 500) eller 1 (højere end 500).
@@ -221,7 +267,7 @@ df4 <-df3 %>%
 
 ####NYT DATASÆT SOM SKAL BRUGES TIL GAM####
 df6 <- data.frame(df3)
-df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event)
+df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event,EmergYear,YearThres)
 #df5$AbundancePTD <- (df5$Abundance/df5$Trapdays)
 #df5$Include <- (df2a$Include[match(paste0(df4$SpeciesID,df4$Plot),paste0(df2a$SpeciesID,df2a$Plot))])
 #Summarise funktionen giver ikke de rigtige resultater.
@@ -266,10 +312,6 @@ class(df7$Abundance)
 #df7$AbundancePTD<-as.numeric(df7$AbundancePTD)
 #class(df7$AbundancePTD)
 
-#Her indlæses filer med data der skal testes.
-df7<-read.csv2("Data/Dataset_for_GAM/EMdata_final.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
-#df5<- read.csv("ZAC_all.csv")
-df7$Year<- as.factor(df7$Year)
 
 #Nu skal filerne TESTES - Der er blevet lavet en loop der indsætter alle SpeciesID i en fil. (df7)
 df7%>%
@@ -299,7 +341,8 @@ for (k in unique(df7$SpeciesID)){
       dfsuba<-subset(dfsuba,Year==j)
       threshold <- length(dfsuba[dfsuba$Abundance >= 1, 1]) # beregne antal events
       sumabund<-sum(dfsuba$Abundance)
-      if(threshold <= 2||sumabund<25){ # skip gam if too few data
+      YearThres<-sum(dfsuba$EmergYear)
+      if(threshold <= 2||sumabund<25||YearThres<1){ # skip gam if too few data
         plot(dfsuba$DOY,dfsuba$Abundance,type="p",main=j,
              ylim=c(0,1.05*max(1,max(dfsuba$Abundance,na.rm=TRUE))),
              xlim=c(154,238))#Det er de åbne symboler der ikke når threshold.
@@ -346,7 +389,8 @@ phenogam <- function(SpeciesID, Plot, Year, data = df7)
               data$Year == Year, ] # Extracting data from species, plot, year combination from df7
     event <- length(y[y$Abundance >= 1, 1])
     cum.abundance <- sum(y$Abundance)
-    if(event <= 2 || cum.abundance <= 24) # Mindst 3 events for at lave g værdi og/eller 25+ abundans.
+    YearThres <- sum(y$EmergYear)
+    if(event <= 2 || cum.abundance <= 24||YearThres<1) # Mindst 3 events for at lave g værdi og/eller 25+ abundans.
       {return(list(NA))} # Return NA, if less than two events have more than 25 specimens.
   g <- gam(round(Abundance,0)~s(DOY, k=4),family=poisson(link = "log"),data=y)#man skal runde abundans op til 0 decimaler fordi der er blevet to familier lagt sammen i starten og derefter skilt ad fordi man fandt ud af at chironomidae var ca. 2% af den samlede og ceratopogonidae var de resterende. Se tokes artikel interannual, spacial, seasonal..
   return(g)}
@@ -475,5 +519,9 @@ df8sub$Year<- as.factor(df8sub$Year)
 
 head(dfOPE)
 
-####SE I SCRIPT 'DATA FOR PLOTS'####
+####SE I SCRIPT 'DATA FOR PLOTS####
+
+ggplot(data=dfOPE, aes(Year,DOY, colour=Pheno.Event)) + ylab("Day of Year") + 
+  geom_boxplot() + facet_wrap(~Pheno.Event,scales = "free_y") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
