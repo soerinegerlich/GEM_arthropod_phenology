@@ -8,6 +8,7 @@ library(lubridate) #Beregner datoer og tidspunkter. Det er en toolbox, eller en 
 library(mgcv) #funktioner der kan analysere med GAM og generalised additive mixed modeling.
 library(MESS) #teste antagelser i GAM, statistiske detaljer.
 library(corrplot)
+library(stringr)
 
 ##### Zackenberg data - downloaded 16 April 2021 #####
 
@@ -111,6 +112,11 @@ sort(unique(df1$SpeciesID))
 df1$SpeciesID[df1$SpeciesID == "PieridaeÂ "] <- "Pieridae" #Der er et mærkeligt Â ud for disse taxa. Her fjernes det.
 df1$SpeciesID[df1$SpeciesID == "TriopsidaeÂ "] <- "Triopsidae"
 
+gsub("TriopsidaeÂ","Triopsidae",df1$SpeciesID)
+gsub("PieridaeÂ ","Pieridae",df1$SpeciesID)
+
+str_replace_all(df1$SpeciesID,"Â","")
+
 #Fjerner dele af data som ikke kan nøgles til familie niveau
 df1<- subset(df1,SpeciesID!="unidentified")
 df1<- subset(df1,SpeciesID!="Brachycera larvae")
@@ -171,13 +177,17 @@ dfAcari<-subset(df2,SpeciesID=="Acari")
 dfAcari<-subset(dfAcari,Plot=="Art1")
 dfAcari<-subset(dfAcari,Year=="1996")
 
+dfCollem<-subset(df2,SpeciesID=="Collembola")
+dfCollem<-subset(dfCollem,Plot=="Art5")
+dfCollem<-subset(dfCollem,Year=="2002")
+
 dfAcari2<-subset(df3,SpeciesID=="Acari")
 dfAcari2<-subset(dfAcari2,Plot=="Art1")
 dfAcari2<-subset(dfAcari2,Year=="1996")
 
-dfAnthomyiidae2<-subset(df2,SpeciesID=="Anthomyiidae")
-dfAnthomyiidae2<-subset(dfAnthomyiidae2,Plot=="Art5")
-dfAnthomyiidae2<-subset(dfAnthomyiidae2,Year=="2002")
+dfCollembola2<-subset(df3,SpeciesID=="Collembola")
+dfCollembola2<-subset(dfCollembola2,Plot=="Art5")
+dfCollembola2<-subset(dfCollembola2,Year=="2002")
 
 dfAgromyzidae2<-subset(df3,SpeciesID=="Agromyzidae")
 dfAgromyzidae2<-subset(dfAgromyzidae2,Plot=="Art1")
@@ -195,18 +205,19 @@ df3$Abundance[is.na(df3$Abundance)] <- 0
 df3$Event<-ifelse(df3$Abundance>0,1,0)
 
 df3$Month<- as.numeric(df3$Month)
+class(df3$Abundance)
 
 df3%>%
-  subset(Month>5&Month<9)%>% #månderne maj til september
+  subset(Month>5&Month<9)%>% 
   group_by(SpeciesID,Plot,Year)%>%
   summarise(TotalAbundance=sum(Abundance),TotalEvents=sum(Event))->df2a
 
 #Vi vil gerne sortere taxa fra, hvor der kun er data for <5 år
-df2a$EmergYear<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2,1,0)
+df2a$TotalAbunAndEventCriteria<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2,1,0)
 
 df2a%>%
   group_by(SpeciesID,Year)%>%
-  summarise(TotalYear=sum(EmergYear))->df3a
+  summarise(TotalYear=sum(TotalAbunAndEventCriteria))->df3a
 
 #Tjek
 dfCecidomyiidaea<-subset(df3a,SpeciesID=="Cecidomyiidae")
@@ -215,7 +226,7 @@ dfAcari3a<-subset(dfAcari3a,Year=="1996")
 
 #Overføre TotalYear kolonne til df2a
 df2a$TotalYear <- (df3a$TotalYear[match(paste0(df2a$SpeciesID,df2a$Year),paste0(df3a$SpeciesID,df3a$Year))])
-df3$EmergYear <- (df2a$EmergYear[match(paste0(df3$SpeciesID,df3$Year),paste0(df2a$SpeciesID,df2a$Year))])
+df3$TotalAbunAndEventCriteria <- (df2a$TotalAbunAndEventCriteria[match(paste0(df3$SpeciesID,df3$Year),paste0(df2a$SpeciesID,df2a$Year))])
 df3$TotalYear <- (df2a$TotalYear[match(paste0(df3$SpeciesID,df3$Year),paste0(df2a$SpeciesID,df2a$Year))])
 
 df3$YearThres<-ifelse(df3$TotalYear>0,1,0)
@@ -223,18 +234,18 @@ df3$Include2<-0
 
 #speciesId = 'Acari'
 for (speciesId in unique(df3$SpeciesID)){
-  dfsub<-subset(df3,SpeciesID==speciesId)
+  dfsub1<-subset(df3,SpeciesID==speciesId)
   
   yearsThatHaveYearThresValueOf1 = 0
   
-  for (year in unique(dfsub$Year)){
-    dfsub1<-subset(dfsub,Year==year)
+  for (year in unique(dfsub1$Year)){
+    dfsub2<-subset(dfsub1,Year==year)
     
-    if (length(unique(dfsub1$YearThres)) > 1) {
+    if (length(unique(dfsub2$YearThres)) > 1) {
       print(paste('ERROR:', 'year', year, 'of species', speciesId, 'has different YearThres values'))
     }
     
-    if (dfsub1$YearThres[1] == 1) {
+    if (dfsub2$YearThres[1] == 1) {
       yearsThatHaveYearThresValueOf1 = yearsThatHaveYearThresValueOf1 + 1
     }
   }
@@ -248,8 +259,10 @@ for (speciesId in unique(df3$SpeciesID)){
   }
 }
 
+df2a$TotalEvents<- as.numeric(df2a$TotalEvents)
+df2a$TotalAbundance<- as.numeric(df2a$TotalAbundance)
 #Tilføjer Include kolonne, hvor alle 3 betingelser angives til at være opfyldt eller ikke
-df2a$Include<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2&df2a$TotalYear>0,1,0)#Need at least ? individuals in a season and 3 capture events
+df2a$Include<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2,1,0)#Need at least ? individuals in a season and 3 capture events
 #mindst 25 individer, indsamlet mindst 3 gange. På et enket år for en enkel art og plot.
 #df2a$Include<-ifelse(df2a$TotalAbundance<500,0,1)#Need at least 100 individuals across years per plot 
 #I den nye kolonne som hedder Include. Ifelse(test_expression,x,y). Resultater vises som enten 0 (mindre end 500) eller 1 (højere end 500).
@@ -267,7 +280,7 @@ df4 <-df3 %>%
 
 ####NYT DATASÆT SOM SKAL BRUGES TIL GAM####
 df6 <- data.frame(df3)
-df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event,EmergYear,YearThres)
+df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event,TotalAbunAndEventCriteria,YearThres,Include2)
 #df5$AbundancePTD <- (df5$Abundance/df5$Trapdays)
 #df5$Include <- (df2a$Include[match(paste0(df4$SpeciesID,df4$Plot),paste0(df2a$SpeciesID,df2a$Plot))])
 #Summarise funktionen giver ikke de rigtige resultater.
@@ -331,6 +344,7 @@ df7$Abundance<- as.numeric(df7$Abundance)
 class(df7$Abundance)
 df7$DOY<- as.numeric(df7$DOY)
 
+
 for (k in unique(df7$SpeciesID)){
   dfsub<-subset(df7,SpeciesID==k)
   pdf(paste("Figures",k,".pdf"),width=20,height=12)
@@ -341,8 +355,8 @@ for (k in unique(df7$SpeciesID)){
       dfsuba<-subset(dfsuba,Year==j)
       threshold <- length(dfsuba[dfsuba$Abundance >= 1, 1]) # beregne antal events
       sumabund<-sum(dfsuba$Abundance)
-      YearThres<-sum(dfsuba$EmergYear)
-      if(threshold <= 2||sumabund<25||YearThres<1){ # skip gam if too few data
+      Include2Thres<-dfsuba$Include2
+      if(threshold <= 2||sumabund<25||Include2Thres<1){ # skip gam if too few data
         plot(dfsuba$DOY,dfsuba$Abundance,type="p",main=j,
              ylim=c(0,1.05*max(1,max(dfsuba$Abundance,na.rm=TRUE))),
              xlim=c(154,238))#Det er de åbne symboler der ikke når threshold.
@@ -359,7 +373,6 @@ for (k in unique(df7$SpeciesID)){
   }
   dev.off()
 }
-
 
 ####################
 # Herunder er fire funktioner (phenodate,phenogam,modpred,EM), der udfører trin i beregningen af
@@ -390,7 +403,8 @@ phenogam <- function(SpeciesID, Plot, Year, data = df7)
     event <- length(y[y$Abundance >= 1, 1])
     cum.abundance <- sum(y$Abundance)
     YearThres <- sum(y$EmergYear)
-    if(event <= 2 || cum.abundance <= 24||YearThres<1) # Mindst 3 events for at lave g værdi og/eller 25+ abundans.
+    Include2Thres<-y$Include2
+    if(event <= 2 || cum.abundance <= 24||Include2Thres<1) # Mindst 3 events for at lave g værdi og/eller 25+ abundans.
       {return(list(NA))} # Return NA, if less than two events have more than 25 specimens.
   g <- gam(round(Abundance,0)~s(DOY, k=4),family=poisson(link = "log"),data=y)#man skal runde abundans op til 0 decimaler fordi der er blevet to familier lagt sammen i starten og derefter skilt ad fordi man fandt ud af at chironomidae var ca. 2% af den samlede og ceratopogonidae var de resterende. Se tokes artikel interannual, spacial, seasonal..
   return(g)}
