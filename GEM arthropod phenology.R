@@ -8,7 +8,7 @@ library(lubridate) #Beregner datoer og tidspunkter. Det er en toolbox, eller en 
 library(mgcv) #funktioner der kan analysere med GAM og generalised additive mixed modeling.
 library(MESS) #teste antagelser i GAM, statistiske detaljer.
 library(corrplot)
-library(stringr)
+#library(stringr)
 
 ##### Zackenberg data - downloaded 16 April 2021 #####
 
@@ -146,10 +146,20 @@ df1%>%
 #Lægger tal fra alle traps i et plot sammen.
 #df2$Abundance<-df2$A+df2$B+df2$C+df2$D+df2$E+df2$F+df2$G+df2$H
 df2$Trapdays<-df2$DaysA+df2$DaysB+df2$DaysC+df2$DaysD+df2$DaysE+df2$DaysF+df2$DaysG+df2$DaysH
+#df2$Abundance<-df2$A+df2$B+df2$C+df2$D+df2$E+df2$F+df2$G+df2$H
+
+#dfAphi<-subset(df22,SpeciesID=="Aphidoidea")
+#dfAnthomyiidae<-subset(df22,SpeciesID=="Anthomyiidae")
+#dfAnthomyzidae<-subset(df22,SpeciesID=="Anthomyzidae")
+#dfMuscidae<-subset(df22,SpeciesID=="Muscidae")
+#dfCeraphronidae<-subset(df22,SpeciesID=="Ceraphronidae")
+#dfCeraphronoidea<-subset(df22,SpeciesID=="Ceraphronoidea")
 
 #sum(subset(df2,SpeciesID=="Acari")$Abundance)
 
 #Abundans test plots - Family level data. 
+
+df2$Abundance<-as.numeric(df2$Abundance)
 
 ##Funktionen spread() kan ikke aggregere data og derfor skal group_by og summarise funktioner inkorporeres.
 ##Andet problem er, at der dannes NA ved alle DOY's hvor der ikke er blevet samlet dyr ind og dette varierer mellem taxa. 
@@ -157,7 +167,7 @@ df2%>%
   group_by(SpeciesID,Year,Plot,Month,DOY,Trapdays)%>%
   summarise(Abundance=A+B+C+D+E+F+G+H)%>%
   within(Abundance[is.na(Abundance)] <- 0)%>%
-  spread(key=SpeciesID,value=Abundance, convert = TRUE)%>%
+  spread(key=SpeciesID,value=Abundance)%>%
   within(Muscidae[is.na(Muscidae)]<- 0)%>%
   within(Anthomyiidae[is.na(Anthomyiidae)]<- 0)%>%
   within(Anthomyzidae[is.na(Anthomyzidae)]<- 0)%>%
@@ -171,11 +181,7 @@ df2%>%
   select(-c(Muscidae,Anthomyiidae,Anthomyzidae,Chironomidae,Ceratopogonidae,Mycetophilidae,Sciaridae))%>%
   gather(key=SpeciesID,value=Abundance,6:71) -> df3
 
-
 #Stikproever for at tjekke om værdierne i df3 er korrekte
-dfAcari<-subset(df2,SpeciesID=="Acari")
-dfAcari<-subset(dfAcari,Plot=="Art1")
-dfAcari<-subset(dfAcari,Year=="1996")
 
 dfCollem<-subset(df2,SpeciesID=="Collembola")
 dfCollem<-subset(dfCollem,Plot=="Art5")
@@ -215,24 +221,31 @@ df3%>%
 #Vi vil gerne sortere taxa fra, hvor der kun er data for <5 år
 df2a$TotalAbunAndEventCriteria<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2,1,0)
 
-df2a%>%
-  group_by(SpeciesID,Year)%>%
-  summarise(TotalYear=sum(TotalAbunAndEventCriteria))->df3a
+#df2a%>%
+  #group_by(SpeciesID,Year)%>%
+  #summarise(TotalYear=sum(TotalAbunAndEventCriteria))->df3a
 
 #Tjek
 dfCecidomyiidaea<-subset(df3a,SpeciesID=="Cecidomyiidae")
 dfAcari3a<-subset(dfAcari3a,Plot=="Art1")
 dfAcari3a<-subset(dfAcari3a,Year=="1996")
 
+#Vi beregner antal år, hvor et plot har opfyldt kriterier for abundans og events
+df2a%>%
+  group_by(SpeciesID,Plot)%>%
+  summarise(TotalYear=sum(TotalAbunAndEventCriteria))->df2b
+
 #Overføre TotalYear kolonne til df2a
-df2a$TotalYear <- (df3a$TotalYear[match(paste0(df2a$SpeciesID,df2a$Year),paste0(df3a$SpeciesID,df3a$Year))])
-df3$TotalAbunAndEventCriteria <- (df2a$TotalAbunAndEventCriteria[match(paste0(df3$SpeciesID,df3$Year),paste0(df2a$SpeciesID,df2a$Year))])
-df3$TotalYear <- (df2a$TotalYear[match(paste0(df3$SpeciesID,df3$Year),paste0(df2a$SpeciesID,df2a$Year))])
+#df2a$TotalYear <- (df3a$TotalYear[match(paste0(df2a$SpeciesID,df2a$Year),paste0(df3a$SpeciesID,df3a$Year))])
+#df3$TotalAbunAndEventCriteria <- (df2a$TotalAbunAndEventCriteria[match(paste0(df3$SpeciesID,df3$Year),paste0(df2a$SpeciesID,df2a$Year))])
+df3$TotalYear <- (df2b$TotalYear[match(paste0(df3$SpeciesID,df3$Plot),paste0(df2b$SpeciesID,df2b$Plot))])
 
-df3$YearThres<-ifelse(df3$TotalYear>0,1,0)
-df3$Include2<-0
 
-#speciesId = 'Acari'
+
+#df3$YearThres<-ifelse(df3$TotalYear>0,1,0)
+#df3$Include2<-0
+
+#Loop til år kriterie####
 for (speciesId in unique(df3$SpeciesID)){
   dfsub1<-subset(df3,SpeciesID==speciesId)
   
@@ -259,6 +272,8 @@ for (speciesId in unique(df3$SpeciesID)){
   }
 }
 
+
+#Beregning af Include####
 df2a$TotalEvents<- as.numeric(df2a$TotalEvents)
 df2a$TotalAbundance<- as.numeric(df2a$TotalAbundance)
 #Tilføjer Include kolonne, hvor alle 3 betingelser angives til at være opfyldt eller ikke
@@ -278,9 +293,12 @@ df4 <-df3 %>%
   select(SpeciesID, everything())
 
 
+
+
+
 ####NYT DATASÆT SOM SKAL BRUGES TIL GAM####
 df6 <- data.frame(df3)
-df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event,TotalAbunAndEventCriteria,YearThres,Include2)
+df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event,TotalYear)
 #df5$AbundancePTD <- (df5$Abundance/df5$Trapdays)
 #df5$Include <- (df2a$Include[match(paste0(df4$SpeciesID,df4$Plot),paste0(df2a$SpeciesID,df2a$Plot))])
 #Summarise funktionen giver ikke de rigtige resultater.
@@ -313,9 +331,11 @@ df7$Year<- as.factor(df7$Year)#den var en integer, men det er nemmere at arbejde
 #df7$Plot<- as.factor(df7$Plot)
 
 class(df7$Abundance)
-typeof(df7$Abundance)
+#typeof(df7$Abundance)
 df7$Abundance<-as.numeric(df7$Abundance)
 class(df7$Abundance)
+
+df7$TotalYear<-as.numeric(df7$TotalYear)
 
 #class(df7$Trapdays)
 #df7$Trapdays<-as.integer(df7$Trapdays)
@@ -355,8 +375,8 @@ for (k in unique(df7$SpeciesID)){
       dfsuba<-subset(dfsuba,Year==j)
       threshold <- length(dfsuba[dfsuba$Abundance >= 1, 1]) # beregne antal events
       sumabund<-sum(dfsuba$Abundance)
-      Include2Thres<-dfsuba$Include2
-      if(threshold <= 2||sumabund<25||Include2Thres<1){ # skip gam if too few data
+      TotalYearThres<-dfsuba$TotalYear
+      if(threshold <= 2||sumabund<25||TotalYearThres<5){ # skip gam if too few data
         plot(dfsuba$DOY,dfsuba$Abundance,type="p",main=j,
              ylim=c(0,1.05*max(1,max(dfsuba$Abundance,na.rm=TRUE))),
              xlim=c(154,238))#Det er de åbne symboler der ikke når threshold.
@@ -402,9 +422,8 @@ phenogam <- function(SpeciesID, Plot, Year, data = df7)
               data$Year == Year, ] # Extracting data from species, plot, year combination from df7
     event <- length(y[y$Abundance >= 1, 1])
     cum.abundance <- sum(y$Abundance)
-    YearThres <- sum(y$EmergYear)
-    Include2Thres<-y$Include2
-    if(event <= 2 || cum.abundance <= 24||Include2Thres<1) # Mindst 3 events for at lave g værdi og/eller 25+ abundans.
+    TotalYearThres<-y$TotalYear
+    if(event <= 2 || cum.abundance <= 24||TotalYearThres<5) # Mindst 3 events for at lave g værdi og/eller 25+ abundans.
       {return(list(NA))} # Return NA, if less than two events have more than 25 specimens.
   g <- gam(round(Abundance,0)~s(DOY, k=4),family=poisson(link = "log"),data=y)#man skal runde abundans op til 0 decimaler fordi der er blevet to familier lagt sammen i starten og derefter skilt ad fordi man fandt ud af at chironomidae var ca. 2% af den samlede og ceratopogonidae var de resterende. Se tokes artikel interannual, spacial, seasonal..
   return(g)}
