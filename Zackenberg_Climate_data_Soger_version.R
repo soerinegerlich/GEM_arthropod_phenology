@@ -1,7 +1,7 @@
-.libPaths() #Tjek hvilken library path der bruges når pakker installeres
+.libPaths() #Tjek hvilken library path der bruges naar pakker installeres
 lib = "C:/Users/au511627/Documents/R/win-library/4.1"
 .libPaths(lib)  #kald denne i starten af din session.
-#Der kan opstå problemer med installering af pakker, hvis pathway til installation er forkert (f.eks. er common) 
+#Der kan opstaa problemer med installering af pakker, hvis pathway til installation er forkert (f.eks. er common) 
 
 #rm(list=ls())
 #Removes all objects from the workspace.
@@ -22,16 +22,20 @@ library(reshape2) #Outdated, better to use Tidyr. Makes it easier to transform d
 #install.packages("data.table")
 library(data.table) #Extension of data.frame. Fast aggregation of large data.
 
+#install.Rtools()
+
 #Read file: Air Temperature and Soil Temperature. Provide full path to file
 dfair <- read.csv("Data/Climate_data_Zackenberg/Air_temperature/View_ClimateBasis_Zackenberg_Data_Air_temperature_Air_temperature__200cm_@_60min_sample__DegreesC070620211141103262.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
 dfsoil1 <- read.csv("Data/Climate_data_Zackenberg/Soil_temperature_0cm/View_ClimateBasis_Zackenberg_Data_Soil_temperature_Soil_temperature__0cm__60min_average__DegreesC07062021115034361.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
 dfsoil2 <- read.csv("Data/Climate_data_Zackenberg/Soil_temperature_5cm/View_ClimateBasis_Zackenberg_Data_Soil_temperature_Soil_temperature__5cm__60min_average__DegreesC070620211206482173.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
 dfsoil3 <- read.csv("Data/Climate_data_Zackenberg/Soil_temperature_10cm/View_ClimateBasis_Zackenberg_Data_Soil_temperature_Soil_temperature__10cm__60min_average__DegreesC070620211210219033.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
 
-dfair = dfair %>% rename("Date"="ï..Date","HourTemp"="Air.temperature..200cm...60min.average..Â.C.") #Fejl vises ved Date. 
-dfsoil1 = dfsoil1 %>% rename("Date"="ï..Date","HourTemp" = "Soil.temperature..0cm...60min.average..Â.C.") #Fejl vises ved Date. 
-dfsoil2 = dfsoil2 %>% rename("Date"="ï..Date","HourTemp" = "Soil.temperature..5cm...60min.average..Â.C.")
-dfsoil3 = dfsoil3 %>% rename("Date"="ï..Date","HourTemp" = "Soil.temperature..10cm...60min.average..Â.C.")
+dfair = dfair %>% rename("Date"="Ã¯..Date","HourTemp"="Air.temperature..200cm...60min.average..Ã‚.C.") #Fejl vises ved Date. 
+dfsoil1 = dfsoil1 %>% rename("Date"="Ã¯..Date","HourTemp" = "Soil.temperature..0cm...60min.average..Ã‚.C.") #Fejl vises ved Date. 
+dfsoil2 = dfsoil2 %>% rename("Date"="Ã¯..Date","HourTemp" = "Soil.temperature..5cm...60min.average..Ã‚.C.")
+dfsoil3 = dfsoil3 %>% rename("Date"="Ã¯..Date","HourTemp" = "Soil.temperature..10cm...60min.average..Ã‚.C.")
+
+colnames(dfair) #NÃ¥r script Ã¥bnes pÃ¥ny laver den uforstaaelige bogstaver om til ?
 
 #Add sensor column
 dfair$Sensor<-"Air"
@@ -46,7 +50,7 @@ dfsoil3$HourTemp <- as.numeric(dfsoil3$HourTemp)
 
 
 #combine datafiles
-#Bind_rows samler tabellerne undre hinanden
+#Bind_rows samler tabellerne under hinanden
 df<-bind_rows(dfair,dfsoil1,dfsoil2,dfsoil3)
 
 #Add columns: Hour, DOY, MONTH, Year
@@ -62,6 +66,7 @@ df$HourTemp[df$HourTemp == -9999] <-NA
 df$HourTemp <-as.numeric(df$HourTemp)
 
 #Seasonal variation in soil temperature across all three soil temp series
+#Middeljordtemperatur for DOY plottes
 df%>%
   subset(Sensor!="Air")%>%
   group_by(Sensor,Year,DOY) %>% 
@@ -77,7 +82,7 @@ df%>%
 df.soil <- df[df$Sensor!="Air",]
 df.soil.agg <- aggregate(df.soil[c("HourTemp")], 
                          by = df.soil[c("Hour", "DOY", "Month", "Year")], FUN=mean, na.rm=T)
-
+#Beregner middelvÃ¦rdien af de tre soil temp sensorer baseret pÃ¥ time, DOY, mÃ¥ned og Year
 #----------------------------------------------------------- 
 
 #Seasonal variation in soil temperature
@@ -91,6 +96,8 @@ df.soil.agg %>%
             FTCycleFall=ifelse(Min<0&Max>0&Dayofyear>200,1,0),
             FTCycle=ifelse(Min<0&Max>0,1,0),
             Growingseason=ifelse(DOYTemp>2,DOY,NA))->df1
+##Der er problemer med NaN vÃ¦rdier i 337 punkter (se nedenstÃ¥ende kode). Dette er foraarsaget af NA vÃ¦rdier i det oprindelige datasÃ¦t, hvor vi har lavet alle -9999 om til NA.
+which(df.soil.agg$HourTemp == "NaN")
 
 #Seasonal temperature for mean soil temp data
 df1%>%
@@ -98,7 +105,7 @@ df1%>%
   geom_line() +
   ylab("Mean daily temperature (degrees C)") + ### of Soil measured at 0,5 and 10 cm
   facet_wrap(~Year)
-#Temperaturen starter sendt og slutter tidligt i det første og sidse år. Årsag?
+
 
 #####Plot number of FT(freeze-thaw events) Fall####
 df1%>%
@@ -153,6 +160,15 @@ df1%>%
   summarize(SeasonTemp=mean(DOYTemp,na.rm=T))%>%
   spread(key=Season,value=SeasonTemp)->df7
 
+###Calculate mean Temp for May, June, July, August, September
+df1%>%
+  subset(5==Month | 6==Month | 7==Month | 8==Month | 9==Month)%>%
+  group_by(Year,Month)%>%
+  summarize(MonthTemp=mean(DOYTemp,na.rm=T))%>%
+  spread(key=Month,value=MonthTemp)%>%
+  setnames(., old =c('5', '6', '7', '8', '9') , new = c('May', 'June', 'July', 'Aug', 'Sep'))->df9
+
+
 ### Calculate mean Winter Temp per year
 
 df1%>%
@@ -181,48 +197,87 @@ df %>%
             FTCycleSpring=ifelse(Min<0&Max>0&Dayofyear<200,1,0),
             FTCycleFall=ifelse(Min<0&Max>0&Dayofyear>200,1,0),
             FTCycle=ifelse(Min<0&Max>0,1,0),
-            Growingseason=ifelse(DOYTemp>2,DOY,NA))->df5
+            Growingseason=ifelse(DOYTemp>2,DOY,NA))->dfair1
 
-df5%>%
+dfair1%>%
   group_by(Year)%>%
   summarize(StartWinter_A=max(Growingseason,na.rm=T),
             EndWinter_A=min(Growingseason,na.rm=T),
             FTEventsSpring_A=sum(FTCycleSpring,na.rm=T),
-            FTEventsFall_A=sum(FTCycleFall,na.rm=T))->df6
+            FTEventsFall_A=sum(FTCycleFall,na.rm=T))->dfair2
 
 ### Lag  for Winter Duration calculations if lag() is in mutate(), it creates NAs
-df6$StartWin_A_Lag<-lag(df6$StartWinter_A)
-df6$DurationW_A<-(365-df6$StartWin_A_Lag)+df6$EndWinter_A
+dfair2$StartWin_A_Lag<-lag(dfair2$StartWinter_A)
+dfair2$DurationW_A<-(365-dfair2$StartWin_A_Lag)+dfair2$EndWinter_A
 
-df5$Season<-Seasons$Season[match(df5$Month,Seasons$Month)]
+dfair1$Season<-Seasons$Season[match(dfair1$Month,Seasons$Month)]
 
-df5%>%
+dfair1%>%
   subset(Season!='Winter')%>%
   group_by(Year,Season)%>%
   summarize(SeasonTemp=mean(DOYTemp,na.rm=T))%>%
-  spread(key=Season,value=SeasonTemp)->df6b
+  spread(key=Season,value=SeasonTemp)->dfair2a
 
-df5%>%
+dfair1%>%
   subset(Season=='Winter')%>%
   group_by(Year,Month)%>%
   summarize(MonthTemp=mean(DOYTemp,na.rm=T))%>%
   spread(key=Month,value=MonthTemp)%>%
-  setnames(., old =c('1', '2', '3', '11', '12') , new = c('Jan', 'Feb', 'Mar', 'Nov', 'Dec'))->df6c
+  setnames(., old =c('1', '2', '3', '11', '12') , new = c('Jan', 'Feb', 'Mar', 'Nov', 'Dec'))->dfair2b
 
 ### Lag winter months from previous year for calculations
-df6c$prevNov<-lag(df6c$Nov)
-df6c$prevDec<-lag(df6c$Dec)
-df6c<-select(df6c,-c('Nov', 'Dec'))
+dfair2b$prevNov<-lag(dfair2b$Nov)
+dfair2b$prevDec<-lag(dfair2b$Dec)
+dfair2b<-select(dfair2b,-c('Nov', 'Dec'))
 
 ### Calculate mean winter temp per year
-df6c$Winter<- rowMeans( df6c[ , 2:6])
+dfair2b$Winter<- rowMeans( dfair2b[ , 2:6])
 
-dfair<-bind_cols(df6,df6b,df6c)
+dfair<-bind_cols(dfair2,dfair2a,dfair2b)
 ### Lag variables to get Previous fall temp for a particular year
-dfair1 <- mutate(dfair, prevFall_temp_A = lag(Autumn),FTevents_LateSeason_A=lag(FTEventsFall_A),FTevents_A=FTevents_LateSeason_A+FTEventsSpring_A,Winter_A=Winter,Spring_A=Spring,Summer_A=Summer)
-dfair2<-select(dfair1, c('Year', 'prevFall_temp_A', 'FTevents_A', 'DurationW_A','Winter_A','Spring_A', 'Summer_A'))
+dfair3 <- mutate(dfair, prevFall_temp_A = lag(Autumn),FTevents_LateSeason_A=lag(FTEventsFall_A),FTevents_A=FTevents_LateSeason_A+FTEventsSpring_A,Winter_A=Winter,Spring_A=Spring,Summer_A=Summer)
+dfair4<-select(dfair3, c('Year...1', 'prevFall_temp_A', 'FTevents_A', 'DurationW_A','Winter_A','Spring_A', 'Summer_A'))
 
-colnames(dfair1)
+colnames(dfair3)
 #Fejl da der ikke er en enlig Year kolonne.
 
+####For luft temp er der beregnet middeltemp for hver sÃ¦son. Beregnes for mÃ¥ned hvis aftale med Toke####
 
+
+
+#Kombinere variable i et datasÃ¦t. Skal tilpasses til bÃ¥de jord og luft temperatur
+#dfall<-bind_cols(df2,df7,df4, df8)
+
+parameters<-select(df7, c('Year', 'Summer'))
+#parameters<-select(dfall1, c('Year', 'prevFall_temp', 'FTevents', 'DurationW','Winter','Spring', 'Summer','prevSummerPrecip'))
+parameters_all<-bind_cols(parameters,dfair4)
+parameters_all$Year...3<-NULL
+dfall$Year2<-NULL
+dfall$Year3<-NULL
+
+#env.data<-subset(parameters_all,Year!=1995)
+#env.data$Year1<-NULL
+#write.csv(env.data,"Data/Climate_parameters_Zackenberg_200314.csv")
+
+#Plots
+#install.packages("cowplot")
+library(cowplot)
+p1<-ggplot(data=parameters_all,aes(Year...1,Summer))+geom_point()+geom_smooth(method="lm")+theme_classic()
+p1
+p2<-ggplot(data=parameters_all,aes(Year...1,Summer_A))+geom_point()+geom_smooth(method="lm")+theme_classic()
+p2
+
+p2<-ggplot(data=env.data,aes(Year,FTevents))+geom_line()+geom_smooth(method="lm")+theme_classic()
+p3<-ggplot(data=env.data,aes(Year,DurationW))+geom_line()+geom_smooth(method="lm")+theme_classic()
+p4<-ggplot(data=env.data,aes(Year,Winter))+geom_line()+geom_smooth(method="lm")+theme_classic()
+p5<-ggplot(data=env.data,aes(Year,Spring))+geom_line()+geom_smooth(method="lm")+theme_classic()
+p6<-ggplot(data=env.data,aes(Year,Summer))+geom_line()+geom_smooth(method="lm")+theme_classic()
+p7<-ggplot(data=env.data,aes(Year,prevSummerPrecip))+geom_line()+geom_smooth(method="lm")+theme_classic()
+
+lm_summersoil<-lm(Summer~Year...1, data=parameters_all)
+summary(lm_summersoil)
+gvlma(lm_summersoil)
+
+lm_summerair<-lm(Summer_A~Year...1, data=parameters_all)
+summary(lm_summerair)
+gvlma(lm_summerair)

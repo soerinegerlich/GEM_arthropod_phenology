@@ -9,6 +9,8 @@ library(corrplot)
 library(stats)
 library(ggplot2)
 
+
+
 dfOPE <- read.csv("Data/Dataset_for_GAM_NEW/dfOPE_dataframe.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
 #dfOPE$Year<- as.factor(dfOPE$Year)
 df8 <- read.csv("Data/Dataset_for_GAM_NEW\\duration.csv", sep=",",stringsAsFactors = FALSE, header = TRUE)
@@ -16,57 +18,15 @@ df8 <- read.csv("Data/Dataset_for_GAM_NEW\\duration.csv", sep=",",stringsAsFacto
 df8sub <- read.csv2("Data/Dataset_for_GAM_NEW\\duration_subset.txt",  sep="\t",stringsAsFactors = FALSE, header = TRUE)
 #df8sub$Year<- as.factor(df8sub$Year)
 
-df8sub$End<-as.numeric(df8sub$End)
-df8sub$Onset<-as.numeric(df8sub$Onset)
-df8sub$Peak<-as.numeric(df8sub$Peak)
-df8sub$Duration<-as.numeric(df8sub$Duration)
-#df8sub$Year<-as.numeric(df8sub$Year)
-#nlevels(df8sub$Year)
-
 df8$End<-as.numeric(df8$End)
 df8$Onset<-as.numeric(df8$Onset)
 df8$Peak<-as.numeric(df8$Peak)
 df8$Duration<-as.numeric(df8$Duration)
 
-
-#En tom df laves
-df8c <- data.frame(matrix(ncol=7,nrow=0, dimnames=list(NULL, c("Year", "Plot", "SpeciesID", "Onset", "Peak", "End", "Duration"))))
-df8c$Onset<-as.numeric(df8c$Onset)
-df8c$Peak<-as.numeric(df8c$Peak)
-df8c$End<-as.numeric(df8c$End)
-df8c$Duration<-as.numeric(df8c$Duration)
-df8c$Year<-as.integer(df8c$Year)
-df8c$Plot<-as.character(df8c$Plot)
-df8c$SpeciesID<-as.character(df8c$SpeciesID)
-
-df8d <- bind_rows(df8c,df8)
-
-df8d$Onset<-0
-df8d$Peak<-0
-df8d$End<-0
-df8d$Duration<-0
-df8d$Year<-0
-df8d$Plot<-0
-df8d$SpeciesID<-0
-
-df8$Onset[is.na(df8$Onset)] <- 0
-df8$Peak[is.na(df8$Peak)] <- 0
-df8$End[is.na(df8$End)] <- 0
-df8$Duration[is.na(df8$Duration)] <- 0
-
-#Kode fra Toke####
-for (i in unique(df8sub$SpeciesID)){  
-  for (j in unique(df8sub$Plot)){   
-    df<-subset(df8sub,SpeciesID==i)   
-    df<-subset(df,Plot==j)   
-    mod1<-lm(((238-154+1)*abundance/trapdays)~year, data = df)   
-    slopes[[i]][[j]]<-c(summary(mod1)$coefficients[c(2,4,6,8)],summary(mod1)$r.squared,sum(df$n>0))
-                                                                                                                                                                                                      sum(df$count),sum(df$n>0))
-}
-}
-
+print(unique(df8$SpeciesID))
 
 #Linear regression models####
+#Første forsøg. Ikke helt rigtig - se hjælp fra Toke nederst
 for (i in unique(df8$SpeciesID)){  
   for (j in unique(df8$Plot)){   
     df8a<-subset(df8,SpeciesID==i)   
@@ -104,8 +64,12 @@ for (i in unique(df8$SpeciesID)){
 }
   
 
+length(df8$Onset[is.na(df8$Onset)])
+
+
+####Hjælp fra Toke####
 df_summary<-data.frame(SpeciesID=character(),Plot=character(),Pheno_event=character(),Slope=numeric(),
-                       SD=numeric(),Tvalue=numeric(),Pvalue=numeric(),Rsquare=numeric(),Count=numeric(),n=numeric())
+                       SD=numeric(),Tvalue=numeric(),Pvalue=numeric(),Rsquare=numeric(),AdjRsquare=numeric(),Count=numeric(),n=numeric())
 
 for (i in unique(df8$SpeciesID)){
   #print(i)
@@ -113,17 +77,25 @@ for (i in unique(df8$SpeciesID)){
   for (j in unique(df8b$Plot)){
     df8a<-subset(df8b,Plot==j)
     
-    if (j == 'Art1' & i == 'Acari') {
-      print(df8a$Onset)
-      print(sum(df8a$Onset))
+    if(sum(!is.na(df8a$Onset))<10){ #sum(is.na) finder alle NA værdier. !is.na fjerner alle NA værdier i en vektor. Men denne kan vel ikke bruges her?
+      #print(sum(is.na(df8$Onset)))
+      #print(sum(!is.na(df8$Onset)))
+      #length(df8$Onset[is.na(df8$Onset)]) #Denne kode viser alle værdier af ikke-NA værdier!!
+      df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1], #sum(!is.na()) er antallet af ikke-Na værdier
+                            Plot=df8a$Plot[1],#[1] betyder at indeksere en vektor. I dete tilfælde får du det første element som output.
+                            Pheno_event="Onset",
+                            Slope=NA,
+                            SD=NA,
+                            Tvalue=NA,
+                            Pvalue=NA,
+                            Rsquare=NA,
+                            AdjRsquare=NA,
+                            Count=NA,
+                            n=NA)
     }
-    
-    if(is.na(sum(df8a$Onset))){
-      #df_temp<-df8a[NA,]
-      }
     else{
-      mod1 <- lm(Onset ~ Year, data =df8a)        
-      df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
+      mod1 <- lm(Onset ~ Year, data =df8a) #Jeg troede det kunne lade sig gøre at bruge sum(na.rm=TRUE) da sande værdier udvælges       
+      df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1], 
                           Plot=df8a$Plot[1],
                           Pheno_event="Onset",
                           Slope=summary(mod1)$coefficients[2],
@@ -131,16 +103,27 @@ for (i in unique(df8$SpeciesID)){
                           Tvalue=summary(mod1)$coefficients[6],
                           Pvalue=summary(mod1)$coefficients[8],
                           Rsquare=summary(mod1)$r.squared,
+                          AdjRsquare=summary(mod1)$adj.r.squared,
                           Count=sum(df8a$count),
-                          n=sum(df8a$Onset>0))
+                          n=sum(!is.na(df8a$Onset)))
       df_summary<-bind_rows(df_summary,df_temp)
     }
+    #plot(mod1)
     
-    
-    
-    if(is.na(sum(df8a$Peak))){
-      #df_temp<-df8a[NA,]
+    if(sum(!is.na(df8a$Peak))<10){
+      df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
+                          Plot=df8a$Plot[1],
+                          Pheno_event="Peak",
+                          Slope=NA,
+                          SD=NA,
+                          Tvalue=NA,
+                          Pvalue=NA,
+                          Rsquare=NA,
+                          AdjRsquare=NA,
+                          Count=NA,
+                          n=NA)
     }
+    
     else{ 
       mod2 <- lm(Peak ~ Year, data =df8a)        
       df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
@@ -151,13 +134,28 @@ for (i in unique(df8$SpeciesID)){
                           Tvalue=summary(mod2)$coefficients[6],
                           Pvalue=summary(mod2)$coefficients[8],
                           Rsquare=summary(mod2)$r.squared,
+                          AdjRsquare=summary(mod2)$adj.r.squared,
                           Count=sum(df8a$count),
-                          n=sum(df8a$Peak>0))
+                          n=sum(!is.na(df8a$Peak)))
       df_summary<-bind_rows(df_summary,df_temp)
     }
-    if(is.na(sum(df8a$End))){
-      #df_temp<-df8a[NA,]
+    
+    #plot(mod2)
+    
+    if(sum(!is.na(df8a$End))<10){
+      df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
+                          Plot=df8a$Plot[1],
+                          Pheno_event="End",
+                          Slope=NA,
+                          SD=NA,
+                          Tvalue=NA,
+                          Pvalue=NA,
+                          Rsquare=NA,
+                          AdjRsquare=NA,
+                          Count=NA,
+                          n=NA)
     }
+    
     else{ 
       
       mod3 <- lm(End ~ Year, data =df8a)        
@@ -169,19 +167,178 @@ for (i in unique(df8$SpeciesID)){
                           Tvalue=summary(mod3)$coefficients[6],
                           Pvalue=summary(mod3)$coefficients[8],
                           Rsquare=summary(mod3)$r.squared,
+                          AdjRsquare=summary(mod3)$adj.r.squared,
                           Count=sum(df8a$count),
-                          n=sum(df8a$End>0))
+                          n=sum(!is.na(df8a$End)))
       df_summary<-bind_rows(df_summary,df_temp)
-    }
-  }
+      }
+    #plot(mod3)
+   }
 }
 
-#df_summary2<-df_summary
+write.csv(df_summary, file = "Data/Linear_regression_results\\dfsummary_dataframe.csv", row.names=FALSE)
+
+
+
+warnings()
 
 df8%>%
   ggplot(aes(Year,Onset)) + ylab("Onset") + 
   geom_smooth(method="lm")+geom_point()+facet_grid(Plot~SpeciesID=="Acari",scales = "free_y") + 
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
-    
+df8%>%
+  ggplot(aes(Year,Peak)) + ylab("Peak") + 
+  geom_smooth(method="lm")+geom_point()+facet_grid(Plot~SpeciesID=="Acari",scales = "free_y") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
+df8%>%
+  ggplot(aes(Year,End)) + ylab("End") + 
+  geom_smooth(method="lm")+geom_point()+facet_grid(Plot~SpeciesID=="Acari",scales = "free_y") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))    
+
+df8%>%
+  ggplot(aes(Year,Onset)) + ylab("Onset") + 
+  geom_smooth(method="lm")+geom_point()+facet_grid(Plot~SpeciesID=="ANMU",scales = "free_y") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+df8%>%
+  ggplot(aes(Year,Onset)) + ylab("Onset") + 
+  geom_smooth(method="lm")+geom_point()+facet_grid(Plot~SpeciesID=="Collembola",scales = "free_y") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+df8%>%
+  ggplot(aes(Year,Onset)) + ylab("Onset") + 
+  geom_smooth(method="lm")+geom_point()+facet_grid(Plot~SpeciesID=="CHCE",scales = "free_y") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+
+
+####MED LOOP####
+#test
+df8a<-subset(df8,SpeciesID=="MYSC"&Plot=="Art1")
+mod1 <- lm(Onset ~ Year, data =df8a) #Jeg troede det kunne lade sig gøre at bruge sum(na.rm=TRUE) da sande værdier udvælges       
+df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1], 
+                    Plot=df8a$Plot[1],
+                    Pheno_event="Onset",
+                    Slope=summary(mod1)$coefficients[2],
+                    SD=summary(mod1)$coefficients[4],
+                    Tvalue=summary(mod1)$coefficients[6],
+                    Pvalue=summary(mod1)$coefficients[8],
+                    Rsquare=summary(mod1)$r.squared,
+                    AdjRsquare=summary(mod1)$adj.r.squared,
+                    Count=sum(df8a$count),
+                    n=sum(!is.na(df8a$Onset)))
+#####
+
+df_summary1<-data.frame(SpeciesID=character(),Plot=character(),Pheno_event=character(),Slope=numeric(),
+                       SD=numeric(),Tvalue=numeric(),Pvalue=numeric(),Rsquare=numeric(),AdjRsquare=numeric(),Count=numeric(),n=numeric())
+
+for (i in unique(df8$SpeciesID)){
+  #print(i)
+  df8b<-subset(df8,SpeciesID==i)
+  for (j in unique(df8b$Plot)){
+    df8a<-subset(df8b,Plot==j)
+    for (k in length(df8a$Onset)){
+      #print('na')
+      #print(is.na(df8a$Onset[k]))
+      
+      if(is.na(df8a$Onset[k]>14)){ #sum(is.na) finder alle NA værdier. !is.na fjerner alle NA værdier i en vektor. Men denne kan vel ikke bruges her?
+        df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1], #sum(!is.na()) er antallet af ikke-Na værdier
+                            Plot=df8a$Plot[1],
+                            Pheno_event="Onset",
+                            Slope=NA,
+                            SD=NA,
+                            Tvalue=NA,
+                            Pvalue=NA,
+                            Rsquare=NA,
+                            AdjRsquare=NA,
+                            Count=NA,
+                            n=NA)
+      }
+      else{
+        mod1 <- lm(Onset ~ Year, data =df8a) #Jeg troede det kunne lade sig gøre at bruge sum(na.rm=TRUE) da sande værdier udvælges       
+        df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1], 
+                            Plot=df8a$Plot[1],
+                            Pheno_event="Onset",
+                            Slope=summary(mod1)$coefficients[2],
+                            SD=summary(mod1)$coefficients[4],
+                            Tvalue=summary(mod1)$coefficients[6],
+                            Pvalue=summary(mod1)$coefficients[8],
+                            Rsquare=summary(mod1)$r.squared,
+                            AdjRsquare=summary(mod1)$adj.r.squared,
+                            Count=sum(df8a$count),
+                            n=sum(!is.na(df8a$Onset>10)))
+        df_summary1<-bind_rows(df_summary1,df_temp)
+      }
+
+
+#plot(mod1)
+          for (l in length(df8a$Peak)){
+if(is.na(df8a$Peak[l]>14)){
+  df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
+                      Plot=df8a$Plot[1],
+                      Pheno_event="Peak",
+                      Slope=NA,
+                      SD=NA,
+                      Tvalue=NA,
+                      Pvalue=NA,
+                      Rsquare=NA,
+                      AdjRsquare=NA,
+                      Count=NA,
+                      n=NA)
+  }
+else{ 
+  mod2 <- lm(Peak ~ Year, data =df8a)        
+  df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
+                      Plot=df8a$Plot[1],
+                      Pheno_event="Peak",
+                      Slope=summary(mod2)$coefficients[2],
+                      SD=summary(mod2)$coefficients[4],
+                      Tvalue=summary(mod2)$coefficients[6],
+                      Pvalue=summary(mod2)$coefficients[8],
+                      Rsquare=summary(mod2)$r.squared,
+                      AdjRsquare=summary(mod2)$adj.r.squared,
+                      Count=sum(df8a$count),
+                      n=sum(!is.na(df8a$Peak>10)))
+  df_summary1<-bind_rows(df_summary1,df_temp)
+  }
+
+#plot(mod2)
+            for (m in length(df8a$End)){
+
+if(is.na(df8a$End[m]>14)){
+  df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
+                      Plot=df8a$Plot[1],
+                      Pheno_event="End",
+                      Slope=NA,
+                      SD=NA,
+                      Tvalue=NA,
+                      Pvalue=NA,
+                      Rsquare=NA,
+                      AdjRsquare=NA,
+                      Count=NA,
+                      n=NA)
+  }
+else{ 
+  
+  mod3 <- lm(End ~ Year, data =df8a)        
+  df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
+                      Plot=df8a$Plot[1],
+                      Pheno_event="End",
+                      Slope=summary(mod3)$coefficients[2],
+                      SD=summary(mod3)$coefficients[4],
+                      Tvalue=summary(mod3)$coefficients[6],
+                      Pvalue=summary(mod3)$coefficients[8],
+                      Rsquare=summary(mod3)$r.squared,
+                      AdjRsquare=summary(mod3)$adj.r.squared,
+                      Count=sum(df8a$count),
+                      n=sum(!is.na(df8a$End>10)))
+  df_summary1<-bind_rows(df_summary1,df_temp)
+  }
+#plot(mod3)
+        }
+      }
+    }
+  }
+}

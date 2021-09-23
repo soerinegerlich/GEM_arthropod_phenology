@@ -16,7 +16,7 @@ library(corrplot)
 #C:\Users\au511627\OneDrive - Aarhus Universitet\PhD projekt\Data\Data_Arthropods Zackenberg\View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence1604202114574319
 
 
-df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence1604202114574319.csv",sep="\t",stringsAsFactors = FALSE)
+df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence13092021143317552.csv",sep="\t",stringsAsFactors = FALSE)
 #df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence030120201503537843.csv",sep="\t",stringsAsFactors = FALSE)
 #df1 <- read.csv2("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_phenology191220172147231575.csv",sep="\t")
 #df1 <- read_excel("Data/View_BioBasis_Zackenberg_Data_Arthropods_Arthropod_emergence030120201503537843.xlsx")
@@ -128,10 +128,12 @@ df1<- subset(df1,SpeciesID!="Symphyta larvae")
 df1<- subset(df1,SpeciesID!="Tipulidae larvae")
 df1<- subset(df1,SpeciesID!="Hymenoptera larvae")
 df1<- subset(df1,Year!="2010")
-#Fjerner 2010, fordi alle kasser med dyr er mistet på vej til DK, på nær lidt prøver fra sidst på sæson. Det er ikke en fuld sæson. hele året bliver fjernet.
+#Prøver fra en fuld sæson i 2010 er endnu ikke tilføjet.
 
-length(unique(df1$SpeciesID))#ender op med 69 levels.#Ender med 70. Er der tilføjet en art mere siden sidst?
+length(unique(df1$SpeciesID))#ender op med 69 levels.#Ender med 70.
 #sort(unique(df1$Year))
+
+#print(unique(df1$SpeciesID))
 
 #Summarize to one value per SpeciesID,Year,Plot,DOY
 df1%>%
@@ -159,7 +161,6 @@ df2$Trapdays<-df2$DaysA+df2$DaysB+df2$DaysC+df2$DaysD+df2$DaysE+df2$DaysF+df2$Da
 
 #Abundans test plots - Family level data. 
 
-df2$Abundance<-as.numeric(df2$Abundance)
 
 ##Funktionen spread() kan ikke aggregere data og derfor skal group_by og summarise funktioner inkorporeres.
 ##Andet problem er, at der dannes NA ved alle DOY's hvor der ikke er blevet samlet dyr ind og dette varierer mellem taxa. 
@@ -180,6 +181,8 @@ df2%>%
        MYSC=Mycetophilidae+Sciaridae)%>%
   select(-c(Muscidae,Anthomyiidae,Anthomyzidae,Chironomidae,Ceratopogonidae,Mycetophilidae,Sciaridae))%>%
   gather(key=SpeciesID,value=Abundance,6:71) -> df3
+
+df3$Abundance<-as.numeric(df3$Abundance)
 
 #Stikproever for at tjekke om værdierne i df3 er korrekte
 
@@ -206,6 +209,9 @@ dfCHCE2<-subset(dfCHCE2,Year=="1997")
 
 #Sørger lige for at fjerne alle NA og erstatter med 0.
 df3$Abundance[is.na(df3$Abundance)] <- 0
+
+####KRITERIER TILFØJES####
+
 #Kolonne med Event oprettes. Hvis abundansen er mere end 0 skrives 1, ellers 0.
 #Dette for at sige at der er et event.
 df3$Event<-ifelse(df3$Abundance>0,1,0)
@@ -217,6 +223,14 @@ df3%>%
   subset(Month>5&Month<9)%>% 
   group_by(SpeciesID,Plot,Year)%>%
   summarise(TotalAbundance=sum(Abundance),TotalEvents=sum(Event))->df2a
+
+####EKSTRA - TJEK TOTAL ABUNDANS FOR HVER FAMILIER I HVERT PLOT####
+#Tjek totalabundans for hver familie i hver plot
+df3%>%
+  subset(Month>5&Month<9)%>% 
+  group_by(SpeciesID,Plot)%>%
+  summarise(TotalAbundance=sum(Abundance))%>%
+  spread(key=Plot,value=TotalAbundance)->df2b
 
 #Vi vil gerne sortere taxa fra, hvor der kun er data for <5 år
 df2a$TotalAbunAndEventCriteria<-ifelse(df2a$TotalAbundance>25&df2a$TotalEvents>2,1,0)
@@ -233,12 +247,12 @@ dfAcari3a<-subset(dfAcari3a,Year=="1996")
 #Vi beregner antal år, hvor et plot har opfyldt kriterier for abundans og events
 df2a%>%
   group_by(SpeciesID,Plot)%>%
-  summarise(TotalYear=sum(TotalAbunAndEventCriteria))->df2b
+  summarise(TotalYear=sum(TotalAbunAndEventCriteria))->df2c
 
 #Overføre TotalYear kolonne til df2a
 #df2a$TotalYear <- (df3a$TotalYear[match(paste0(df2a$SpeciesID,df2a$Year),paste0(df3a$SpeciesID,df3a$Year))])
 #df3$TotalAbunAndEventCriteria <- (df2a$TotalAbunAndEventCriteria[match(paste0(df3$SpeciesID,df3$Year),paste0(df2a$SpeciesID,df2a$Year))])
-df3$TotalYear <- (df2b$TotalYear[match(paste0(df3$SpeciesID,df3$Plot),paste0(df2b$SpeciesID,df2b$Plot))])
+df3$TotalYear <- (df2c$TotalYear[match(paste0(df3$SpeciesID,df3$Plot),paste0(df2c$SpeciesID,df2c$Plot))])
 
 
 
@@ -294,11 +308,10 @@ df4 <-df3 %>%
 
 
 
-
-
 ####NYT DATASÆT SOM SKAL BRUGES TIL GAM####
 df6 <- data.frame(df3)
 df5 <- select(df6, SpeciesID,Plot,Year,DOY,Abundance,Include,Event,TotalYear)
+sum(is.na(df5$Include))#Tjek om der er nogle NA værdier
 #df5$AbundancePTD <- (df5$Abundance/df5$Trapdays)
 #df5$Include <- (df2a$Include[match(paste0(df4$SpeciesID,df4$Plot),paste0(df2a$SpeciesID,df2a$Plot))])
 #Summarise funktionen giver ikke de rigtige resultater.
@@ -333,7 +346,7 @@ df7$Year<- as.factor(df7$Year)#den var en integer, men det er nemmere at arbejde
 class(df7$Abundance)
 #typeof(df7$Abundance)
 df7$Abundance<-as.numeric(df7$Abundance)
-class(df7$Abundance)
+
 
 df7$TotalYear<-as.numeric(df7$TotalYear)
 
@@ -368,7 +381,7 @@ df7$DOY<- as.numeric(df7$DOY)
 for (k in unique(df7$SpeciesID)){
   dfsub<-subset(df7,SpeciesID==k)
   pdf(paste("Figures",k,".pdf"),width=20,height=12)
-  par(mfrow=c(7,23),oma = c(5,5,4,0) ,mar = c(2,1,2,2) + 0.1) #it goes c(bottom, left, top, right) 
+  par(mfrow=c(7,24),oma = c(5,5,4,0) ,mar = c(2,1,2,2) + 0.1) #it goes c(bottom, left, top, right) 
   for (i in unique(dfsub$Plot)){
     for(j in unique(dfsub$Year)){
       dfsuba<-subset(dfsub,Plot==i)
@@ -429,6 +442,7 @@ phenogam <- function(SpeciesID, Plot, Year, data = df7)
   return(g)}
 # Denne funktion estimerer en ikke-lineær gam funktion (generalized additive model) til at beskrive sæsondynamikken for
 # en given art i et plot i et år.
+#k angiver antal af dimensioner som skal bruges til at repræsentere smooth-funktionen
 
 
 #### modpred --- FUNKTION ####
@@ -473,15 +487,34 @@ EM <- sapply(levels(as.factor(df7$SpeciesID)), function(SpeciesID) {
 #Her laves listen (EM) om til en dataframe
 dfEM <- as.data.frame(EM)
 #Her tilføjes beskrivende variable
-dfEM$Pheno.Event <- rep(c("Onset","Peak","End"),161) #23*7=161
-dfEM$Year<- rep(c(seq(1996,2009,by=1),seq(2011,2019,by=1)),each=3,times=7)
-dfEM$Plot<-rep(c("Art1","Art2","Art3","Art4","Art5","Art6","Art7"),each=69)#23*3=69
+dfEM$Pheno.Event <- rep(c("Onset","Peak","End"),168) #24*7=168
+dfEM$Year<- rep(c(seq(1996,2009,by=1),seq(2011,2020,by=1)),each=3,times=7)
+dfEM$Plot<-rep(c("Art1","Art2","Art3","Art4","Art5","Art6","Art7"),each=72)#24*3=72
+##Dette skal tjekkes. 
 
 
 #Her stables alle artsdata ovenpå hinanden.
 dfOPE <- gather(dfEM,key=SpeciesID,value=DOY,1:69,-Year,-Plot,-Pheno.Event)
+#Forsøg på at tilføje abundans variabel men virker ikke
+
+df7%>%
+  group_by(SpeciesID,Plot,Year)%>%
+  summarise(TotalAbundance=sum(Abundance),
+            MeanAbundance=mean(Abundance,na.rm=T))->df7a
+
+dfOPE$TotalAbundance <- df7a$TotalAbundance[match(paste0(dfOPE$SpeciesID,dfOPE$Year,dfOPE$Plot),
+                                                  paste0(df7a$SpeciesID,df7a$Year,df7a$Plot))]
+
+
+class(df7$Abundance)
+df7%>%
+  group_by(SpeciesID,Plot,Year,Abundance)%>%
+  summarise(TotalAbundance=sum(Abundance))->df7a
+df7b<-cbind(dfOPE,df7a[c("Year","Plot","SpeciesID","TotalAbundance")])
+
+
 #ncol(dfEM) kan erstatte 69.
-#length(dfEM). For at finde ud af længden af datasættet. Det er 69.
+length(dfEM) #For at finde ud af længden af datasættet. Det er 69.
 #OPE = Onset, Peak, End
 #write.csv(df5, file = "Data/Dataset_for_GAM\\EMdata_final.csv", row.names=FALSE)
 write.csv(dfOPE, file = "Data/Dataset_for_GAM_NEW\\dfOPE_dataframe.csv", row.names=FALSE)
@@ -511,7 +544,7 @@ df8 <- dfOPE %>%
 dfAcari3<-subset(dfOPE,SpeciesID=="Acari")
 dfAcari3<-subset(dfAcari3,Plot=="Art2")
 dfAcari3<-subset(dfAcari3,Year=="1997")
-class(dfOPE$End)
+class(df8$End)
 df8$End<-as.numeric(df8$End)
 df8$Onset<-as.numeric(df8$Onset)
 df8$Peak<-as.numeric(df8$Peak)
