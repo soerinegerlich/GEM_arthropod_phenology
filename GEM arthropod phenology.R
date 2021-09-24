@@ -505,13 +505,7 @@ df7%>%
 dfOPE$TotalAbundance <- df7a$TotalAbundance[match(paste0(dfOPE$SpeciesID,dfOPE$Year,dfOPE$Plot),
                                                   paste0(df7a$SpeciesID,df7a$Year,df7a$Plot))]
 
-
-class(df7$Abundance)
-df7%>%
-  group_by(SpeciesID,Plot,Year,Abundance)%>%
-  summarise(TotalAbundance=sum(Abundance))->df7a
-df7b<-cbind(dfOPE,df7a[c("Year","Plot","SpeciesID","TotalAbundance")])
-
+dfOPE$TotalAbundance[is.na(dfOPE$TotalAbundance)] <- 0
 
 #ncol(dfEM) kan erstatte 69.
 length(dfEM) #For at finde ud af længden af datasættet. Det er 69.
@@ -548,10 +542,11 @@ class(df8$End)
 df8$End<-as.numeric(df8$End)
 df8$Onset<-as.numeric(df8$Onset)
 df8$Peak<-as.numeric(df8$Peak)
+df8$TotalAbundance<-as.numeric(df8$TotalAbundance)
 
 df8$Duration <- (df8$End - df8$Onset)
 df8 <- df8 %>% 
-  select(Year, Plot, SpeciesID, Onset, Peak, End, Duration)
+  select(Year, Plot, SpeciesID, TotalAbundance, Onset, Peak, End, Duration)
 df8sub <- subset(df8, df8$Duration != "NA") #Dette subset er kun værdier der ikke har NA
 df8$Year<- as.factor(df8$Year)
 df8sub$Year<- as.factor(df8sub$Year)
