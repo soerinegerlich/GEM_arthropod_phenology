@@ -72,10 +72,8 @@ df_summary<-data.frame(SpeciesID=character(),Plot=character(),Pheno_event=charac
                        SD=numeric(),Tvalue=numeric(),Pvalue=numeric(),Rsquare=numeric(),AdjRsquare=numeric(),Count=numeric(),n=numeric())
 
 for (i in unique(df8$SpeciesID)){
-  #print(i)
+  print(i)
   df8b<-subset(df8,SpeciesID==i)
-  pdf(paste("Figures_test",i,".pdf"),width=15,height=10)
-  par(mfrow=c(5,10),oma = c(2,2,1,0) ,mar = c(2,1,2,2) + 0.1)
   for (j in unique(df8b$Plot)){
     df8a<-subset(df8b,Plot==j)
     
@@ -97,11 +95,6 @@ for (i in unique(df8$SpeciesID)){
     }
     else{
       mod1 <- lm(Onset ~ Year, data =df8a) #Jeg troede det kunne lade sig gøre at bruge sum(na.rm=TRUE) da sande værdier udvælges       
-      #pred <- data.frame(Year = seq(1996,2020, by=0.1))
-      #pred$Onset <- df8a$Onset
-      plot(df8a$Year,df8a$Onset,type="l",col="black",lwd=1,main=j,
-      ylim=c(154,238*max(c(max(df8a$Onset,na.rm=TRUE)))))
-      points(df8a$Year,df8a$Onset,pch=16,cex=1.5)
       df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1], 
                           Plot=df8a$Plot[1],
                           Pheno_event="Onset",
@@ -116,9 +109,7 @@ for (i in unique(df8$SpeciesID)){
       df_summary<-bind_rows(df_summary,df_temp)
     }
     #plot(mod1)
-  }
-  dev.off()
-}
+
     
     if(sum(!is.na(df8a$Peak))<10){
       df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
@@ -135,7 +126,7 @@ for (i in unique(df8$SpeciesID)){
     }
     
     else{ 
-      mod2 <- lm(Peak ~ Year, data =df8a)        
+      mod2 <- lm(Peak ~ Year, data =df8a)
       df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
                           Plot=df8a$Plot[1],
                           Pheno_event="Peak",
@@ -168,7 +159,7 @@ for (i in unique(df8$SpeciesID)){
     
     else{ 
       
-      mod3 <- lm(End ~ Year, data =df8a) 
+      mod3 <- lm(End ~ Year, data =df8a)
       df_temp<-data.frame(SpeciesID=df8a$SpeciesID[1],
                           Plot=df8a$Plot[1],
                           Pheno_event="End",
@@ -183,10 +174,11 @@ for (i in unique(df8$SpeciesID)){
       df_summary<-bind_rows(df_summary,df_temp)
       }
     #plot(mod3)
-   }
+  }
 }
 
-write.csv(df_summary, file = "Data/Linear_regression_results\\dfsummary_dataframe.csv", row.names=FALSE)
+
+write.csv(df_summary, file = "Data/Linear_regression\\dfsummary_dataframe.csv", row.names=FALSE)
 
 
 

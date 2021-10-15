@@ -25,10 +25,10 @@ library(data.table) #Extension of data.frame. Fast aggregation of large data.
 #install.Rtools()
 
 #Read file: Air Temperature and Soil Temperature. Provide full path to file
-dfair <- read.csv("Data/Climate_data_Zackenberg/Air_temperature/View_ClimateBasis_Zackenberg_Data_Air_temperature_Air_temperature__200cm_@_60min_sample__DegreesC070620211141103262.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
-dfsoil1 <- read.csv("Data/Climate_data_Zackenberg/Soil_temperature_0cm/View_ClimateBasis_Zackenberg_Data_Soil_temperature_Soil_temperature__0cm__60min_average__DegreesC07062021115034361.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
-dfsoil2 <- read.csv("Data/Climate_data_Zackenberg/Soil_temperature_5cm/View_ClimateBasis_Zackenberg_Data_Soil_temperature_Soil_temperature__5cm__60min_average__DegreesC070620211206482173.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
-dfsoil3 <- read.csv("Data/Climate_data_Zackenberg/Soil_temperature_10cm/View_ClimateBasis_Zackenberg_Data_Soil_temperature_Soil_temperature__10cm__60min_average__DegreesC070620211210219033.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
+dfair <- read.csv("Data/Climate_data_Zackenberg/Air_temperature/View_ClimateBasis_Zackenberg_Data_Air_temperature_Air_temperature__200cm_@_60min_sample__DegreesC131020210926499996.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
+dfsoil1 <- read.csv("Data/Climate_data_Zackenberg/Soil_temperature_0cm/View_ClimateBasis_Zackenberg_Data_Soil_temperature_Soil_temperature__0cm__60min_average__DegreesC121020211635024106.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
+dfsoil2 <- read.csv("Data/Climate_data_Zackenberg/Soil_temperature_5cm/View_ClimateBasis_Zackenberg_Data_Soil_temperature_Soil_temperature__5cm__60min_average__DegreesC121020211636280909.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
+dfsoil3 <- read.csv("Data/Climate_data_Zackenberg/Soil_temperature_10cm/View_ClimateBasis_Zackenberg_Data_Soil_temperature_Soil_temperature__10cm__60min_average__DegreesC121020211637203249.csv",sep="\t",stringsAsFactors = FALSE, header = TRUE)
 
 dfair = dfair %>% rename("Date"="ï..Date","HourTemp"="Air.temperature..200cm...60min.average..Â.C.") #Fejl vises ved Date. 
 dfsoil1 = dfsoil1 %>% rename("Date"="ï..Date","HourTemp" = "Soil.temperature..0cm...60min.average..Â.C.") #Fejl vises ved Date. 
@@ -37,7 +37,7 @@ dfsoil3 = dfsoil3 %>% rename("Date"="ï..Date","HourTemp" = "Soil.temperature..1
 
 colnames(dfair) #Når script åbnes påny laver den uforstaaelige bogstaver om til ?
 
-#Add sensor column
+#Add sensor column. Inden datasættene forbindes skal der tilføjes en kolonne som angiver hvilke type data der er tale om.
 dfair$Sensor<-"Air"
 dfsoil1$Sensor<-"Soil0"
 dfsoil2$Sensor<-"Soil5"
@@ -57,6 +57,7 @@ df<-bind_rows(dfair,dfsoil1,dfsoil2,dfsoil3)
 df %>%
   separate(Time, c("Hour", "Minute", 'Seconds'), ":")->df
 
+
 df$DOY <- yday(ymd(df$Date))
 df$Month <- month(ymd(df$Date))
 df$Year <- year(ymd(df$Date))
@@ -65,11 +66,11 @@ df$Year <- year(ymd(df$Date))
 df$HourTemp[df$HourTemp == -9999] <-NA
 df$HourTemp <-as.numeric(df$HourTemp)
 
+
 #Seasonal variation in soil temperature across all three soil temp series
-#Middeljordtemperatur for DOY plottes
 df%>%
   subset(Sensor!="Air")%>%
-  group_by(Sensor,Year,DOY) %>% 
+  group_by(Sensor,Year,DOY)%>% 
   summarize(DOYTemp=mean(HourTemp,na.rm=T))%>%
   ggplot(aes(x=DOY, y=DOYTemp,colour=Sensor)) + 
   geom_line() +
@@ -86,6 +87,7 @@ df.soil.agg <- aggregate(df.soil[c("HourTemp")],
 #----------------------------------------------------------- 
 
 #Seasonal variation in soil temperature
+#Middeljordtemperatur for DOY plottes. Ikke grupperet for sensor
 df.soil.agg %>%
   group_by(Year,Month,DOY) %>% 
   summarize(DOYTemp=mean(HourTemp,na.rm=T),
@@ -124,8 +126,8 @@ df1%>%
             EndWinter=min(Growingseason,na.rm=T),
             FTEventsSpring=sum(FTCycleSpring,na.rm=T),
             FTEventsFall=sum(FTCycleFall,na.rm=T))%>%
-  #  ggplot(aes(x=Year, y=FTEventsSpring+FTEventsFall)) +geom_point()
-  ggplot(aes(x=Year, y=EndWinter)) +geom_point()
+  ggplot(aes(x=Year, y=FTEventsSpring+FTEventsFall)) +geom_point()
+  #ggplot(aes(x=Year, y=EndWinter)) +geom_point()
 
 #Summarize number of FT events
 df1%>%
@@ -237,47 +239,56 @@ dfair<-bind_cols(dfair2,dfair2a,dfair2b)
 ### Lag variables to get Previous fall temp for a particular year
 dfair3 <- mutate(dfair, prevFall_temp_A = lag(Autumn),FTevents_LateSeason_A=lag(FTEventsFall_A),FTevents_A=FTevents_LateSeason_A+FTEventsSpring_A,Winter_A=Winter,Spring_A=Spring,Summer_A=Summer)
 dfair4<-select(dfair3, c('Year...1', 'prevFall_temp_A', 'FTevents_A', 'DurationW_A','Winter_A','Spring_A', 'Summer_A'))
-
-colnames(dfair3)
-#Fejl da der ikke er en enlig Year kolonne.
+dfair5<-select(dfair4,c('Year...1', 'Summer_A'))
+dfair4%>%
+  rename(Year = Year...1)->dfair6
 
 ####For luft temp er der beregnet middeltemp for hver sæson. Beregnes for måned hvis aftale med Toke####
 
 
 
 #Kombinere variable i et datasæt. Skal tilpasses til både jord og luft temperatur
-#dfall<-bind_cols(df2,df7,df4, df8)
+dfall<-bind_cols(df2,df7,df8)
+dfall$Year...8<-NULL
+dfall$Year...12<-NULL
+dfall%>%
+  rename(Year = Year...1)->dfall1
 
-parameters<-select(df7, c('Year', 'Summer'))
-#parameters<-select(dfall1, c('Year', 'prevFall_temp', 'FTevents', 'DurationW','Winter','Spring', 'Summer','prevSummerPrecip'))
-parameters_all<-bind_cols(parameters,dfair4)
-parameters_all$Year...3<-NULL
-dfall$Year2<-NULL
-dfall$Year3<-NULL
+### Lag variables to get Previous fall temp for a particular year
+dfall2 <- mutate(dfall1, prevFall_temp = lag(Autumn), FTevents_LateSeason=lag(FTEventsFall),FTevents=FTevents_LateSeason+FTEventsSpring)
 
-#env.data<-subset(parameters_all,Year!=1995)
+
+parameters<-select(dfall2, c('Year', 'prevFall_temp', 'FTevents', 'DurationW','Winter','Spring', 'Summer'))
+parameters_all<-bind_cols(parameters,dfair6)
+parameters_all$Year...8<-NULL
+parameters_all%>%
+  rename(Year = Year...1)->parameters_all
+
+env.data<-subset(parameters_all,Year!=1995)
 #env.data$Year1<-NULL
+write.csv(env.data, file = "Data/Climate_data_Zackenberg\\Climate_parameters_Zackenberg.csv", row.names=FALSE)
 #write.csv(env.data,"Data/Climate_parameters_Zackenberg_200314.csv")
 
 #Plots
 #install.packages("cowplot")
 library(cowplot)
-p1<-ggplot(data=parameters_all,aes(Year...1,Summer))+geom_point()+geom_smooth(method="lm")+theme_classic()
-p1
-p2<-ggplot(data=parameters_all,aes(Year...1,Summer_A))+geom_point()+geom_smooth(method="lm")+theme_classic()
-p2
-
+p1<-ggplot(data=env.data,aes(Year,prevFall_temp))+geom_line()+geom_smooth(method="lm")+theme_classic()
 p2<-ggplot(data=env.data,aes(Year,FTevents))+geom_line()+geom_smooth(method="lm")+theme_classic()
 p3<-ggplot(data=env.data,aes(Year,DurationW))+geom_line()+geom_smooth(method="lm")+theme_classic()
 p4<-ggplot(data=env.data,aes(Year,Winter))+geom_line()+geom_smooth(method="lm")+theme_classic()
 p5<-ggplot(data=env.data,aes(Year,Spring))+geom_line()+geom_smooth(method="lm")+theme_classic()
 p6<-ggplot(data=env.data,aes(Year,Summer))+geom_line()+geom_smooth(method="lm")+theme_classic()
-p7<-ggplot(data=env.data,aes(Year,prevSummerPrecip))+geom_line()+geom_smooth(method="lm")+theme_classic()
+#p7<-ggplot(data=env.data,aes(Year,prevSummerPrecip))+geom_line()+geom_smooth(method="lm")+theme_classic()
 
-lm_summersoil<-lm(Summer~Year...1, data=parameters_all)
-summary(lm_summersoil)
-gvlma(lm_summersoil)
+plot_grid(p4,p1,p2,p5,p3,p6)
 
-lm_summerair<-lm(Summer_A~Year...1, data=parameters_all)
-summary(lm_summerair)
-gvlma(lm_summerair)
+p1A<-ggplot(data=env.data,aes(Year,prevFall_temp_A))+geom_line()+geom_smooth(method="lm")+theme_classic()
+p2A<-ggplot(data=env.data,aes(Year,FTevents_A))+geom_line()+geom_smooth(method="lm")+theme_classic()
+p3A<-ggplot(data=env.data,aes(Year,DurationW_A))+geom_line()+geom_smooth(method="lm")+theme_classic()
+p4A<-ggplot(data=env.data,aes(Year,Winter_A))+geom_line()+geom_smooth(method="lm")+theme_classic()
+p5A<-ggplot(data=env.data,aes(Year,Spring_A))+geom_line()+geom_smooth(method="lm")+theme_classic()
+p6A<-ggplot(data=env.data,aes(Year,Summer_A))+geom_line()+geom_smooth(method="lm")+theme_classic()
+
+
+plot_grid(p4A,p1A,p2A,p5A,p3A,p6A)
+
