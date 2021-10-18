@@ -80,7 +80,77 @@ dfsnow %>%
   select(-c(Field_remarks,General_remarks)) -> dfsnow
 
 
+#Subsetting one year for simplification
+dfsnow%>%
+  subset(Year=='2014')->dfsnow2014
 
+#Remove months >8 as we are only interested in date of snow melt early in the season
+dfsnow2014%>%
+  subset(!Month>8)->dfsnow2014
+
+#Remove traps E to H as measurements for these traps have not been continuous and contains many NA's
+dfsnow2014<-subset(dfsnow2014,Section!="E")
+dfsnow2014<-subset(dfsnow2014,Section!="F")
+dfsnow2014<-subset(dfsnow2014,Section!="G")
+dfsnow2014<-subset(dfsnow2014,Section!="H")
+
+#Snow melt DOY for each subplot
+dfsnow2014$Snowmelt_DOY<-ifelse(dfsnow2014$SnowCoverFraction<50,1,0)
+
+
+dfsnow2014$DOY<- as.numeric(dfsnow2014$DOY)
+dfsnow2014$SnowCoverFraction<- as.numeric(dfsnow2014$SnowCoverFraction)
+dfsnow2014$Snowmelt_DOY<-as.numeric(dfsnow2014$Snowmelt_DOY)
+
+#Date of first snow melt (<50% snow cover)
+df_snowmelt_all<-data.frame(Plot=character(),Section=character(),SnowCoverFraction=numeric(),DOY=numeric())
+                       
+
+for (k in unique(dfsnow2014$Plot)){
+  #print(dfsnow2014$Plot)
+  dfsub<-subset(dfsnow2014,Plot==k)
+  for (i in unique(dfsub$Section)){
+    print(i)
+    #for(j in unique(dfsub$Year)){
+      dfsuba<-subset(dfsub,Section==i)
+      dfsuba<-subset(dfsuba,Year==j)
+      if(dfsuba%>%group_by(Plot, Section)%>%summarise(DOY_snowmelt=SnowCoverFraction<=50)){
+        df_SnowMeltSection<-data.frame(Plot=dfsuba$Plot[1], #sum(!is.na()) er antallet af ikke-Na værdier
+                            Section=dfsuba$Section[1],#[1] betyder at indeksere en vektor. I dete tilfælde får du det første element som output.
+                            SnowCoverFraction=dfsuba$SnowCoverFraction[1],
+                            DOY=dfsuba$DOY[1])
+                    
+      }
+      else{
+        df_SnowMeltSection1<-data.frame(Plot=dfsuba$Plot[1], #sum(!is.na()) er antallet af ikke-Na værdier
+                                       Section=dfsuba$Section[1],#[1] betyder at indeksere en vektor. I dete tilfælde får du det første element som output.
+                                       SnowCoverFraction=dfsuba$SnowCoverFraction[1],
+                                       DOY=dfsuba$DOY[1])
+        df_snowmelt_all<-bind_rows(df_snowmelt_all,df_SnowMeltSection)
+      }
+    }
+  }
+#}
+      
+###Forsøg med eksempel fra StackOverflow
+first_equal_to <- function(x,value){
+  (x==value) & (cumsum(x==value)==1)
+}
+  
+
+dfsnow2014%>%
+  group_by(Plot, Section)%>%
+  mutate(first=first_equal_to(Snowmelt_DOY,1))->dftest
+
+dftest$first[dftest$first == FALSE] <- 0
+
+
+
+#Mean value of snow melt for each plot
+dfsnow2014%>%
+  group_by(DOY,Plot)%>%
+  summarise(MeanSnowCover=mean(unique(Section)))%>%
+  spread(key=Plot,value=MeanSnowCover)->dfsnowtest
 
 
 
