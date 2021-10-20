@@ -102,37 +102,8 @@ dfsnow2014$DOY<- as.numeric(dfsnow2014$DOY)
 dfsnow2014$SnowCoverFraction<- as.numeric(dfsnow2014$SnowCoverFraction)
 dfsnow2014$Snowmelt_DOY<-as.numeric(dfsnow2014$Snowmelt_DOY)
 
-#Date of first snow melt (<50% snow cover)
-df_snowmelt_all<-data.frame(Plot=character(),Section=character(),SnowCoverFraction=numeric(),DOY=numeric())
-                       
-
-for (k in unique(dfsnow2014$Plot)){
-  #print(dfsnow2014$Plot)
-  dfsub<-subset(dfsnow2014,Plot==k)
-  for (i in unique(dfsub$Section)){
-    print(i)
-    #for(j in unique(dfsub$Year)){
-      dfsuba<-subset(dfsub,Section==i)
-      dfsuba<-subset(dfsuba,Year==j)
-      if(dfsuba%>%group_by(Plot, Section)%>%summarise(DOY_snowmelt=SnowCoverFraction<=50)){
-        df_SnowMeltSection<-data.frame(Plot=dfsuba$Plot[1], #sum(!is.na()) er antallet af ikke-Na værdier
-                            Section=dfsuba$Section[1],#[1] betyder at indeksere en vektor. I dete tilfælde får du det første element som output.
-                            SnowCoverFraction=dfsuba$SnowCoverFraction[1],
-                            DOY=dfsuba$DOY[1])
-                    
-      }
-      else{
-        df_SnowMeltSection1<-data.frame(Plot=dfsuba$Plot[1], #sum(!is.na()) er antallet af ikke-Na værdier
-                                       Section=dfsuba$Section[1],#[1] betyder at indeksere en vektor. I dete tilfælde får du det første element som output.
-                                       SnowCoverFraction=dfsuba$SnowCoverFraction[1],
-                                       DOY=dfsuba$DOY[1])
-        df_snowmelt_all<-bind_rows(df_snowmelt_all,df_SnowMeltSection)
-      }
-    }
-  }
-#}
       
-###Forsøg med eksempel fra StackOverflow
+###Forsøg med at finde første DOY med <50% snedække.
 first_equal_to <- function(x,value){
   (x==value) & (cumsum(x==value)==1)
 }
@@ -146,13 +117,99 @@ dftest$first[dftest$first == FALSE] <- 0
 
 
 
+
 #Mean value of snow melt for each plot
-dfsnow2014%>%
-  group_by(DOY,Plot)%>%
-  summarise(MeanSnowCover=mean(unique(Section)))%>%
-  spread(key=Plot,value=MeanSnowCover)->dfsnowtest
+dftest%>%
+  group_by(Plot, first)%>%
+  summarise(MeanSnowmelt=mean(DOY))->dfsnowtest
+  #spread(key=Plot,value=MeanSnowCover)->dfsnowtest
+dfsnowtest$MeanSnowmelt <- as.numeric(dfsnowtest$MeanSnowmelt)
+
+dfsnowtest<-subset(dfsnowtest,first!="0")
+
+
+####CALCULATION OF SNOWMELT FOR WHOLE DATASET####
+
+
+#Remove months >8 as we are only interested in date of snow melt early in the season
+dfsnow%>%
+  subset(!Month>7)->dfsnow
+
+
+#Remove subplots E - H but first we need to isolate 2019
+dfsnow%>%
+  subset(Year!='2019')->dfsnow_sub
+
+#Remove traps E to H as measurements for these traps have not been continuous and contains many NA's
+dfsnow_sub<-subset(dfsnow_sub,Section!="E")
+dfsnow_sub<-subset(dfsnow_sub,Section!="F")
+dfsnow_sub<-subset(dfsnow_sub,Section!="G")
+dfsnow_sub<-subset(dfsnow_sub,Section!="H")
+
+#Remove subplots A - D for 2019 (data never contained data og NA value for these subplots)
+dfsnow%>%
+  subset(Year=='2019')->dfsnow2019
+
+#Create new dataset with all subplots
+dfsnow_ref<-bind_rows(dfsnow_sub,dfsnow2019)
+
+dfsnow_ref$SnowCoverFraction<-as.numeric(dfsnow_ref$SnowCoverFraction)
+which(is.na(dfsnow_ref$SnowCoverFraction))
+
+#We now have a dataframe with irrelevant subplots removed
+
+#Snow melt DOY for each subplot
+dfsnow_ref$Snowmelt_DOY<-ifelse(dfsnow_ref$SnowCoverFraction<=50,1,0)
+
+###Forsøg med at finde første DOY med <50% snedække.
+first_equal_to <- function(x,value){
+  (x==value) & (cumsum(x==value)==1)
+}
+
+
+dfsnow_ref%>%
+  group_by(Year, Plot, Section)%>%
+  mutate(first=first_equal_to(Snowmelt_DOY,1))->dfsnowmelt
+
+dfsnowmelt$first[dfsnowmelt$first == FALSE] <- 0
+
+dfsnowmelt%>%
+  subset(first=='1')->dfsnowmelt_ref
+
+
+#Mean value of snow melt for each plot
+dfsnowmelt_ref%>%
+  group_by(Year,Plot, first)%>%
+  summarise(MeanSnowmelt=mean(DOY))->dfsnowmeltall
+#spread(key=Plot,value=MeanSnowCover)->dfsnowtest
+dfsnowtest$MeanSnowmelt <- as.numeric(dfsnowtest$MeanSnowmelt)
+
+dfsnowtest<-subset(dfsnowtest,first!="0")
+
+ggplot(data=dfsnowmeltall, aes(x=Year, y=MeanSnowmelt, colour=Plot)) +ylab("Day of Year") +geom_line()+geom_point()
+
+
+ggplot(data=dfsnowmeltall, aes(x=Year, y=MeanSnowmelt, colour=Plot)) +ylab("Day of Year") +geom_line()+geom_point()+geom_smooth(method="lm")+theme_classic()
+
+####Check for linear regression####
+
+df_summary<-data.frame(Plot=character(),Slope=numeric(),SD=numeric(),Tvalue=numeric(),Pvalue=numeric(),Rsquare=numeric(),AdjRsquare=numeric(),Count=numeric(),n=numeric())
+
+for (i in unique(dfsnowmeltall$Plot)){
+  #print(i)
+  dfsnowmeltall1<-subset(dfsnowmeltall,Plot==i)
+  mod1 <- lm(MeanSnowmelt ~ Year, data =dfsnowmeltall1)
+  df_snowall<-data.frame(Plot=dfsnowmeltall1$Plot[1],
+                      Slope=summary(mod1)$coefficients[2],
+                      SD=summary(mod1)$coefficients[4],
+                      Tvalue=summary(mod1)$coefficients[6],
+                      Pvalue=summary(mod1)$coefficients[8],
+                      Rsquare=summary(mod1)$r.squared,
+                      AdjRsquare=summary(mod1)$adj.r.squared,
+                      n=sum(dfsnowmeltall1$MeanSnowmelt))
+  df_summary<-bind_rows(df_summary,df_snowall)
+}
 
 
 
-               
 
