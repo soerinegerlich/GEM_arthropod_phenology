@@ -10,6 +10,7 @@ library(stats)
 library(ggplot2)
 
 
+####Dette script indeholder kode til linear regression af phen. event data. Figurer laves i et andet script####
 
 dfOPE <- read.csv("Data/Dataset_for_GAM_NEW/dfOPE_dataframe.csv",sep=",",stringsAsFactors = FALSE, header = TRUE)
 #dfOPE$Year<- as.factor(dfOPE$Year)
@@ -177,6 +178,11 @@ for (i in unique(df8$SpeciesID)){
   }
 }
 
+###Test for autocorrelation with a lag value of 1
+###How is this incorporated in the above code?
+Box.test(df8$Onset, lag = 1, type = c("Ljung-Box"),fitdf=0)
+Box.test(df8$Peak, lag = 1, type = c("Ljung-Box"),fitdf=0)
+Box.test(df8$End, lag = 1, type = c("Ljung-Box"),fitdf=0)
 
 write.csv(df_summary, file = "Data/Linear_regression\\dfsummary_dataframe.csv", row.names=FALSE)
 

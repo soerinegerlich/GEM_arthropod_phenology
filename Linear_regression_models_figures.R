@@ -9,6 +9,8 @@ library(corrplot)
 library(stats)
 library(ggplot2)
 
+####Dette script er kun ti figurer for linear regression af phen. event data####
+
 df8 <- read.csv("Data/Dataset_for_GAM_NEW\\duration.csv", sep=",",stringsAsFactors = FALSE, header = TRUE)
 #df8$Year<- as.factor(df8$Year)
 

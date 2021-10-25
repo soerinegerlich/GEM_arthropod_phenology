@@ -191,6 +191,8 @@ ggplot(data=dfsnowmeltall, aes(x=Year, y=MeanSnowmelt, colour=Plot)) +ylab("Day 
 
 ggplot(data=dfsnowmeltall, aes(x=Year, y=MeanSnowmelt, colour=Plot)) +ylab("Day of Year") +geom_line()+geom_point()+geom_smooth(method="lm")+theme_classic()
 
+write.csv(dfsnowmeltall, file = "Data/Climate_data_Zackenberg\\Snowmelt_Zackenberg.csv", row.names=FALSE)
+
 ####Check for linear regression####
 
 df_summary<-data.frame(Plot=character(),Slope=numeric(),SD=numeric(),Tvalue=numeric(),Pvalue=numeric(),Rsquare=numeric(),AdjRsquare=numeric(),Count=numeric(),n=numeric())
