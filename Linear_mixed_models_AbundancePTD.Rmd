@@ -1,0 +1,1017 @@
+---
+title: "Linear_mixed_models_ptd"
+author: "Sørine"
+date: "2023-09-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(gvlma) #For assessing linear model assumptions. 
+library(car)
+library(writexl)
+library(readxl)
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+#install.packages("sjPlot")
+#library(agricolae)
+library(metafor)
+#library(codingMatrices)
+library(MASS)
+library(gridExtra)
+library(cowplot)
+#devtools::install_github("strengejacke/strengejacke")
+
+#df_phen_event <- read.csv("Data/Piecewise_regression_temperature/piecewise_temp.csv", sep=",",stringsAsFactors = FALSE, header = TRUE)
+df_phen_event_air <- read.csv("Data/Climate_data_Zackenberg/Air_temp_30_days_rolling.csv", sep=",",stringsAsFactors = FALSE, header = TRUE)
+
+
+#df8 <- read.csv("Data/Dataset_for_GAM_NEW\\duration.csv", sep=",",stringsAsFactors = FALSE, header = TRUE)
+
+dfsnowmelt_climatestation <- readxl::read_xlsx("Data/Climate_data_Zackenberg/Snowmelt_climatestation.xlsx")
+#Match climate variables with phen. event data to compile them in the same dataframe
+#df_phen_event_air$Snowmelt <- dfsnowmelt_plot$MeanSnowmelt[match(paste0(df_phen_event_air$Year, df_phen_event_air$Plot),
+                                                                  #paste0(dfsnowmelt_plot$Year, dfsnowmelt_plot$Plot))]
+
+#Match climate variables with phen. event data to compile them in the same dataframe
+df_phen_event_air$Snowmelt <- dfsnowmelt_climatestation$DOY[match(paste0(df_phen_event_air$Year),
+                                                  paste0(dfsnowmelt_climatestation$Year))]
+
+df_phen_event_air %>%
+  mutate(Order = case_when(
+    SpeciesID == "Acari" ~ "Decomposer",
+    SpeciesID == "ANMU" ~ "Mixed feeder",
+    SpeciesID == "Aphidoidea" ~ "Herbivor",
+    SpeciesID == "Chalcidoidea" ~ "Parasitoid",
+    SpeciesID == "CHCE" ~ "Mixed feeder",
+    SpeciesID == "Coccoidea" ~ "Herbivor",
+    SpeciesID == "Collembola" ~ "Decomposer",
+    SpeciesID == "Culicidae" ~ "Mixed feeder",
+    SpeciesID == "Ichneumonidae" ~ "Parasitoid",
+    SpeciesID == "Linyphiidae" ~ "Predator",
+    SpeciesID == "Lycosidae" ~ "Predator",
+    SpeciesID == "MYSC" ~ "Mixed feeder",
+    SpeciesID == "Nymphalidae" ~ "Mixed feeder",
+    SpeciesID == "Phoridae" ~ "Mixed feeder",
+    SpeciesID == "Scathophagidae" ~ "Mixed feeder",
+    SpeciesID == "Thomisidae" ~ "Predator")) -> df_phen_event
+
+df_phen_event %>%
+  mutate(Emerge = case_when(
+    SpeciesID == "Acari" ~ "Early",
+    SpeciesID == "ANMU" ~ "Late",
+    SpeciesID == "Aphidoidea" ~ "Late",
+    SpeciesID == "Chalcidoidea" ~ "Late",
+    SpeciesID == "CHCE" ~ "Early",
+    SpeciesID == "Coccoidea" ~ "Late",
+    SpeciesID == "Collembola" ~ "Early",
+    SpeciesID == "Culicidae" ~ "Late",
+    SpeciesID == "Ichneumonidae" ~ "Late",
+    SpeciesID == "Linyphiidae" ~ "Early",
+    SpeciesID == "Lycosidae" ~ "Early",
+    SpeciesID == "MYSC" ~ "Early",
+    SpeciesID == "Nymphalidae" ~ "Late",
+    SpeciesID == "Phoridae" ~ "Late",
+    SpeciesID == "Scathophagidae" ~ "Late",
+    SpeciesID == "Thomisidae" ~ "Early")) -> df_phen_event
+
+df_phen_event %>%
+  mutate(Trait = case_when(
+    SpeciesID == "Acari" ~ "Surface",
+    SpeciesID == "ANMU" ~ "Flying",
+    SpeciesID == "Aphidoidea" ~ "Surface",
+    SpeciesID == "Chalcidoidea" ~ "Flying",
+    SpeciesID == "CHCE" ~ "Flying",
+    SpeciesID == "Coccoidea" ~ "Surface",
+    SpeciesID == "Collembola" ~ "Surface",
+    SpeciesID == "Culicidae" ~ "Flying",
+    SpeciesID == "Ichneumonidae" ~ "Flying",
+    SpeciesID == "Linyphiidae" ~ "Surface",
+    SpeciesID == "Lycosidae" ~ "Surface",
+    SpeciesID == "MYSC" ~ "Flying",
+    SpeciesID == "Nymphalidae" ~ "Flying",
+    SpeciesID == "Phoridae" ~ "Flying",
+    SpeciesID == "Scathophagidae" ~ "Flying",
+    SpeciesID == "Thomisidae" ~ "Surface")) -> df_phen_event
+
+df_phen_event <- df_phen_event[!(df_phen_event$Plot == "Art1" & (df_phen_event$Order == "Decomposer")),]
+df_phen_event <- df_phen_event[!(df_phen_event$Plot == "Art6" & (df_phen_event$Order == "Decomposer")),]
+df_phen_event <- df_phen_event[!(df_phen_event$Plot == "Art6" & (df_phen_event$Order == "Predator")),]
+df_phen_event <- df_phen_event[!(df_phen_event$Plot == "Art1" & (df_phen_event$Order == "Predator")),]
+df_phen_event <- df_phen_event[!(df_phen_event$Plot == "Art6" & (df_phen_event$Order == "Parasitoid")),]
+df_phen_event <- df_phen_event[!(df_phen_event$Plot == "Art6" & (df_phen_event$Order == "Mixed feeder")),]
+df_phen_event <- df_phen_event[!(df_phen_event$Plot == "Art3" & (df_phen_event$SpeciesID == "Nymphalidae")),]
+df_phen_event <- df_phen_event[!(df_phen_event$SpeciesID == "Lygaeidae"),]
+
+df_phen_event <- subset(df_phen_event, !Plot == "Art6")
+
+df_phen_event %>%
+  mutate(Habitat = case_when(
+    Plot == "Art1" ~ "Pond",
+    Plot == "Art2" ~ "Wet fen",
+    Plot == "Art3" ~ "Mesic heath",
+    Plot == "Art4" ~ "Mesic heath",
+    Plot == "Art5" ~ "Arid heath",
+    Plot == "Art7" ~ "Arid heath")) -> df_phen_event
+
+```
+
+```{r}
+df_phen_event$Order[is.na(df_phen_event$Order)] <- "NA"
+df_phen_event<- subset(df_phen_event,Order!="NA")
+
+#Detrending with year as covariate, accounting for variation in arthropod taxa
+# Peak_Temp and Snowmelt as well as random variation of plot and their interaction
+#But we also need to account for within subject variation
+df_phen_event$speciesplot<-as.factor(paste(df_phen_event$SpeciesID, df_phen_event$Plot))
+
+df_phen_event$Peak_Temp_new<-df_phen_event$Peak_Temp30-tapply(df_phen_event$Peak_Temp30,df_phen_event$speciesplot,mean)[df_phen_event$speciesplot]
+df_phen_event$Onset_Temp_new<-df_phen_event$Onset_Temp30-tapply(df_phen_event$Onset_Temp30,df_phen_event$speciesplot,mean)[df_phen_event$speciesplot]
+df_phen_event$End_Temp_new<-df_phen_event$End_Temp30-tapply(df_phen_event$End_Temp30,df_phen_event$speciesplot,mean)[df_phen_event$speciesplot]
+
+model <- lmer(Peak ~ 1 + Snowmelt + Peak_Temp_new + Year + (1 + Snowmelt + Peak_Temp_new | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Peak_Temp_new | speciesplot), data=df_phen_event)
+summary(model)
+
+#m0<-lmer(Peak~x+Snowmelt+Year+(1+x+Snowmelt|SpeciesID)+(1+x+Snowmelt|SpeciesID:Plot)
+ #        +(1|Year)+(1|Year:SpeciesID)+(1|Plot), data=df_phen_event)
+
+
+#(1 | Predictor) indicates variation in intercept
+#SpeciesID/Plot indicates varying intercepts by taxa and plots nested within taxa
+#(1 + Peak_Temp | SpeciesID/Plot) allows the slope of temperature to vary by taxa with nested plot
+#Problem: Temperature is a continuous variable
+anova(model)
+
+
+tab_model(model, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+         title = "Peak ~ Snowmelt + Temp + Year + (1 | Year) + (1 + Temp + Snowmelt | Taxa) + (1 | Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "Year"), pred.labels = c("Intercept", "Snowmelt", "Temp", "Year"), dv.labels = "", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+```
+
+```{r}
+
+#df_phen_event$Onset_Temp_new<-df_phen_event$Onset_Temp-tapply(df_phen_event$Onset_Temp,df_phen_event$speciesplot,mean)[df_phen_event$speciesplot]
+
+model <- lmer(Duration ~ 1 + Snowmelt + Onset_Temp_new + Year + (1 + Snowmelt + Onset_Temp_new | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Onset_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model)
+
+
+tab_model(model, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "Year"), 
+          pred.labels = c("Intercept", "Snowmelt", "Temp", "Year"), title = "Duration ~ Snowmelt + Temp + Year + (1 | Year) + (1 + Temp + Snowmelt | Taxa) + (1 | Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+```
+
+
+```{r}
+df_phen_event$Plot <- as.factor(df_phen_event$Plot)
+
+unique(df_phen_event$Plot)
+
+H1 = c(0, 0, 1/2, 1/2, -1/2, -1/2)
+H2 = c(0, -1, 1/2, 1/2, 0, 0)
+H3 = c(0, 1, 0, 0, -1/2, -1/2)
+H5 = c(1, -1/5, -1/5, -1/5, -1/5, -1/5)
+L <- rbind(H1, H2, H5) # bind the rows together
+L %>% fractions()
+S <- ginv(L) # compute the inverse
+S 
+
+contrasts(df_phen_event$Plot) <- S
+contrasts(df_phen_event$Plot)
+
+model2 <- lmer(Peak ~ 1 + Peak_Temp30 + Year + Snowmelt*Plot + (1 | Plot:SpeciesID), data=df_phen_event)
+summary(model2)
+
+tab_model(model2, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp30", "Plot1", "Plot2", "Plot3", "Plot4", "Snowmelt:Plot1",  "Snowmelt:Plot2",  "Snowmelt:Plot4",  "Snowmelt:Plot5"),
+         pred.labels = c("Intercept", "Temp", "Snowmelt", "Mesic vs Arid", "Mesic vs Fen", "Snow bed vs all", "Pond vs All", "Snowmelt:Mesic vs Arid", "Snowmelt:Mesic vs Fen", "Snowmelt:Snow bed vs all", "Snowmelt:Pond vs All"), title = "Peak ~ Snowmelt + Temp + Plot + Snowmelt:Plot", dv.labels = "R2", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+```
+
+```{r}
+df_phen_event$Plot <- as.factor(df_phen_event$Plot)
+
+
+H1 = c(0, 0, 1/2, 1/2, -1/2, -1/2)
+H2 = c(0, -1, 1/2, 1/2, 0, 0)
+H3 = c(0, 1, 0, 0, -1/2, -1/2)
+H5 = c(1, -1/5, -1/5, -1/5, -1/5, -1/5)
+L <- rbind(H1, H2, H5) # bind the rows together
+L %>% fractions()
+S <- ginv(L) # compute the inverse
+S 
+
+contrasts(df_phen_event$Plot) <- S
+contrasts(df_phen_event$Plot)
+
+model2a <- lmer(Peak ~ 1 + Peak_Temp + Year + Snowmelt*Plot + (1 | Plot:SpeciesID), data=df_phen_event)
+summary(model2a)
+
+tab_model(model2a, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp", "Plot1", "Plot2", "Plot3", "Snowmelt:Plot1", "Snowmelt:Plot2",  "Snowmelt:Plot3"),
+         pred.labels = c("Intercept", "Temp", "Snowmelt", "Mesic vs Arid", "Fen vs Mesic", "Pond vs All", "Snowmelt:Mesic vs Arid", "Snowmelt:Fen vs Mesic", "Snowmelt:Pond vs All"), title = "Peak ~ Snowmelt + Temp + Plot + Snowmelt:Plot", dv.labels = "R3", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+```
+
+```{r}
+df_phen_event$Plot <- as.factor(df_phen_event$Plot)
+
+
+H1 = c(0, 0, 1/2, 1/2, -1/2, -1/2)
+H2 = c(0, -1, 1/2, 1/2, 0, 0)
+H3 = c(0, 1, 0, 0, -1/2, -1/2)
+H5 = c(1, -1/5, -1/5, -1/5, -1/5, -1/5)
+L <- rbind(H1, H3, H5) # bind the rows together
+L %>% fractions()
+S <- ginv(L) # compute the inverse
+S 
+
+contrasts(df_phen_event$Plot) <- S
+contrasts(df_phen_event$Plot)
+
+model3 <- lmer(Peak ~ 1 + Snowmelt + Year + Peak_Temp*Plot + (1 | Plot:SpeciesID), data=df_phen_event)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp", "Plot1", "Plot2", "Plot3", "Peak_Temp:Plot1",  "Peak_Temp:Plot2",  "Peak_Temp:Plot3"),
+         pred.labels = c("Intercept", "Snowmelt", "Temp", "Mesic vs Arid", "Fen vs Arid", "Pond vs All", "Temp:Mesic vs Arid", "Temp:Fen vs Arid", "Temp:Pond vs All"), title = "Peak ~ Snowmelt + Temp + Plot + Temp:Plot", dv.labels = "R2", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+```
+
+```{r}
+df_phen_event$Plot <- as.factor(df_phen_event$Plot)
+
+
+H1 = c(0, 0, 1/2, 1/2, -1/2, -1/2)
+H2 = c(0, -1, 1/2, 1/2, 0, 0)
+H3 = c(0, 1, 0, 0, -1/2, -1/2)
+H5 = c(1, -1/5, -1/5, -1/5, -1/5, -1/5)
+L <- rbind(H1, H2) # bind the rows together
+L %>% fractions()
+S <- ginv(L) # compute the inverse
+S 
+
+contrasts(df_phen_event$Plot) <- S
+contrasts(df_phen_event$Plot)
+
+model3a <- lmer(Peak ~ 1 + Snowmelt + Year + Peak_Temp*Plot + (1 | Plot:SpeciesID), data=df_phen_event)
+summary(model3a)
+
+tab_model(model3a, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp", "Plot1", "Plot2", "Plot3", "Plot4", "Peak_Temp:Plot1",  "Peak_Temp:Plot2",  "Peak_Temp:Plot3",  "Peak_Temp:Plot4"),
+         pred.labels = c("Intercept", "Snowmelt", "Temp", "Mesic vs Arid", "Fen vs Arid", "Snow bed vs all", "Pond vs All", "Temp:Mesic vs Arid", "Temp:Fen vs Arid", "Temp:Snow bed vs all", "Temp:Pond vs All"), title = "Peak ~ Snowmelt + Temp + Plot + Temp:Plot", dv.labels = "R3", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+```
+
+
+```{r}
+df_phen_event$Plot <- as.factor(df_phen_event$Plot)
+
+
+H1 = c(0, 0, 1/2, 1/2, -1/2, -1/2)
+H2 = c(0, -1, 1/2, 1/2, 0, 0)
+H3 = c(0, 1, 0, 0, -1/2, -1/2)
+H5 = c(1, -1/5, -1/5, -1/5, -1/5, -1/5)
+L <- rbind(H1, H2, H3) # bind the rows together
+L %>% fractions()
+S <- ginv(L) # compute the inverse
+S 
+
+contrasts(df_phen_event$Plot) <- S
+contrasts(df_phen_event$Plot)
+
+model4 <- lmer(Duration ~ 1 + Onset_Temp + Year + Snowmelt*Plot + (1 | Plot:SpeciesID), data=df_phen_event)
+summary(model4)
+
+tab_model(model4, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp", "Plot1", "Plot2", "Plot3", "Plot4", "Snowmelt:Plot1",  "Snowmelt:Plot2",  "Snowmelt:Plot3",  "Snowmelt:Plot4"),
+         pred.labels = c("Intercept", "Snowmelt", "Temp", "Mesic vs Arid", "Mesic vs Fen", "Snow bed vs all", "Pond vs All", "Snowmelt:Mesic vs Arid", "Snowmelt:Mesic vs Fen", "Snowmelt:Snow bed vs all", "Snowmelt:Pond vs All"), title = "Duration ~ Snowmelt + Temp + Plot + Snowmelt:Plot", dv.labels = "R2", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+```
+
+```{r}
+df_phen_event$Plot <- as.factor(df_phen_event$Plot)
+
+
+H1 = c(0, 0, 1/2, 1/2, -1/2, -1/2)
+H2 = c(0, -1, 1/2, 1/2, 0, 0)
+H3 = c(0, 1, 0, 0, -1/2, -1/2)
+H5 = c(1, -1/5, -1/5, -1/5, -1/5, -1/5)
+L <- rbind(H1, H3) # bind the rows together
+L %>% fractions()
+S <- ginv(L) # compute the inverse
+S 
+
+contrasts(df_phen_event$Plot) <- S
+contrasts(df_phen_event$Plot)
+
+model4 <- lmer(Duration ~ 1 + Onset_Temp + Year + Snowmelt*Plot + (1 | Plot:SpeciesID), data=df_phen_event)
+summary(model4)
+
+tab_model(model4, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp", "Plot1", "Plot2", "Plot3", "Snowmelt:Plot1",  "Snowmelt:Plot2",  "Snowmelt:Plot3"),
+         pred.labels = c("Intercept", "Snowmelt", "Temp", "Mesic vs Arid", "Fen vs Arid", "Pond vs All", "Snowmelt:Mesic vs Arid", "Snowmelt:Fen vs Arid", "Snowmelt:Pond vs All"), title = "Duration ~ Snowmelt + Temp + Plot + Snowmelt:Plot", dv.labels = "R3", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+```
+
+```{r}
+df_phen_event$Plot <- as.factor(df_phen_event$Plot)
+
+
+H1 = c(0, 0, 1/2, 1/2, -1/2, -1/2)
+H2 = c(0, -1, 1/2, 1/2, 0, 0)
+H3 = c(0, 1, 0, 0, -1/2, -1/2)
+H5 = c(1, -1/5, -1/5, -1/5, -1/5, -1/5)
+L <- rbind(H1, H2) # bind the rows together
+L %>% fractions()
+S <- ginv(L) # compute the inverse
+S 
+
+contrasts(df_phen_event$Plot) <- S
+contrasts(df_phen_event$Plot)
+
+model3a <- lmer(Duration ~ 1 + Snowmelt + Onset_Temp*Plot + Year + (1 | Plot:SpeciesID), data=df_phen_event)
+summary(model3a)
+
+tab_model(model3a, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp", "Plot1", "Plot2", "Plot3", "Plot4", "Onset_Temp:Plot1",  "Onset_Temp:Plot2",  "Onset_Temp:Plot3",  "Onset_Temp:Plot4"),
+         pred.labels = c("Intercept", "Snowmelt", "Temp", "Mesic vs Arid", "Mesic vs Fen", "Snow bed vs all", "Pond vs All", "Temp:Mesic vs Arid", "Temp:Mesic vs Fen", "Temp:Snow bed vs all", "Temp:Pond vs All"), title = "Duration ~ Snowmelt + Temp + Plot + Temp:Plot", dv.labels = "R2", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+```
+
+```{r}
+df_phen_event$Plot <- as.factor(df_phen_event$Plot)
+
+
+H1 = c(0, 0, 1/2, 1/2, -1/2, -1/2)
+H2 = c(0, -1, 1/2, 1/2, 0, 0)
+H3 = c(0, 1, 0, 0, -1/2, -1/2)
+H5 = c(1, -1/5, -1/5, -1/5, -1/5, -1/5)
+L <- rbind(H1, H3, H5) # bind the rows together
+L %>% fractions()
+S <- ginv(L) # compute the inverse
+S 
+
+contrasts(df_phen_event$Plot) <- S
+contrasts(df_phen_event$Plot)
+
+model3a <- lmer(Duration ~ 1 + Snowmelt + Year + Onset_Temp*Plot + (1 | Plot:SpeciesID), data=df_phen_event)
+summary(model3a)
+
+tab_model(model3a, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp", "Plot1", "Plot2", "Plot3", "Onset_Temp:Plot1",  "Onset_Temp:Plot2",  "Onset_Temp:Plot3"),
+         pred.labels = c("Intercept", "Snowmelt", "Temp", "Mesic vs Arid", "Fen vs Arid", "Pond vs All", "Temp:Mesic vs Arid", "Temp:Fen vs Arid", "Temp:Pond vs All"), title = "Duration ~ Snowmelt + Temp + Plot + Temp:Plot", dv.labels = "R3", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+```
+
+Decomposer
+```{r}
+df_phen_event$Order <- as.factor(df_phen_event$Order)
+#contrasts(df_phen_event$Plot) <- contr.treatment(7, base = 1)
+contrasts(df_phen_event$Order) <- contr.treatment(5, base = 1)
+
+
+
+model_decomp <- lmer(Peak ~ 1 + Snowmelt*Order + Peak_Temp_new*Order + Year + (1 | Year) + (1 | SpeciesID:Plot) + (1 + Snowmelt + Peak_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model_decomp)
+anova(model_decomp)
+
+tab_model(model_decomp, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "Year", "Order2", "Order3", "Order4", "Order5", "Snowmelt:Order2",  "Snowmelt:Order3",  "Snowmelt:Order4", "Snowmelt:Order5", "Order2:Peak_Temp_new",  "Order3:Peak_Temp_new",  "Order4:Peak_Temp_new", "Order5:Peak_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Herbivore", "Parasitoid", "Mixed feeder", "Predator",
+                         "Temp", "Year", "Snowmelt:Herbivore", "Snowmelt:Parasitoid", "Snowmelt:Mixed feeder", "Snowmelt:Predator", "Temp:Herbivore", "Temp:Parasitoid", "Temp:Mixed feeder", "Temp:Predator"), title = "Peak ~ Snowmelt*Group + Temp*Group + Year + (1 | Year) + (1 | Taxa:Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "Compared group: Decomposer", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+```
+
+Herbivore
+```{r}
+df_phen_event$Order <- as.factor(df_phen_event$Order)
+contrasts(df_phen_event$Order) <- contr.treatment(5, base = 2)
+
+
+model_herb <- lmer(Peak ~ 1 + Snowmelt*Order + Peak_Temp_new*Order + Year + (1 | SpeciesID:Plot) + (1 + Snowmelt + Peak_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model_herb)
+sjPlot::plot_model(model_herb,
+                   show.values=TRUE, show.p=TRUE)
+
+tab_model(model_herb, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "Year", "Order1", "Order3", "Order4", "Order5", "Snowmelt:Order1",  "Snowmelt:Order3",  "Snowmelt:Order4", "Snowmelt:Order5", "Order1:Peak_Temp_new",  "Order3:Peak_Temp_new",  "Order4:Peak_Temp_new", "Order5:Peak_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Decomposer", "Parasitoid", "Mixed feeder", "Predator",
+                         "Temp", "Year", "Snowmelt:Decomposer", "Snowmelt:Parasitoid", "Snowmelt:Mixed feeder", "Snowmelt:Predator", "Temp:Decomposer", "Temp:Parasitoid", "Temp:Mixed feeder", "Temp:Predator"), title = "Peak ~ Snowmelt*Group + Temp*Group + Year + (1 | Year) + (1 | Taxa:Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "Compared group: Herbivore", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+```
+
+Parasitoid
+```{r}
+df_phen_event$Order <- as.factor(df_phen_event$Order)
+contrasts(df_phen_event$Order) <- contr.treatment(5, base = 3)
+
+
+model_para <- lmer(Peak ~ 1 + Snowmelt*Order + Peak_Temp_new*Order + Year + (1 | Year) + (1 | SpeciesID:Plot) + (1 + Snowmelt + Peak_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model_para)
+anova(model_para)
+
+tab_model(model_para, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)",  "Snowmelt", "Peak_Temp_new", "Year", "Order1", "Order2", "Order4", "Order5", "Snowmelt:Order1",  "Snowmelt:Order2",  "Snowmelt:Order4", "Snowmelt:Order5", "Order1:Peak_Temp_new",  "Order2:Peak_Temp_new",  "Order4:Peak_Temp_new", "Order5:Peak_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Decomposer", "Herbivore", "Mixed feeder", "Predator",
+                         "Temp", "Year", "Snowmelt:Decomposer", "Snowmelt:Herbivore", "Snowmelt:Mixed feeder", "Snowmelt:Predator", "Temp:Decomposer", "Temp:Herbivore", "Temp:Mixed feeder", "Temp:Predator"), title = "Peak ~ Snowmelt*Group + Temp*Group + Year + (1 | Year) + (1 | Taxa:Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "Compared group: Parasitoids", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+```
+
+Mixed feeders
+```{r}
+unique(df_phen_event$Order)
+df_phen_event$Order <- as.factor(df_phen_event$Order)
+contrasts(df_phen_event$Order) <- contr.treatment(5, base = 4)
+
+
+
+model_poll <- lmer(Peak ~ 1 + Snowmelt*Order + Peak_Temp_new*Order + Year + (1 | Year) + (1 | SpeciesID:Plot) + (1 + Snowmelt + Peak_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model_poll)
+anova(model_poll)
+
+
+tab_model(model_poll, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE, show.re.var = TRUE,
+          terms = c("(Intercept)",  "Snowmelt", "Peak_Temp_new", "Year", "Order1", "Order2", "Order3", "Order5", "Snowmelt:Order1",  "Snowmelt:Order2",  "Snowmelt:Order3", "Snowmelt:Order5", "Order1:Peak_Temp_new",  "Order2:Peak_Temp_new",  "Order3:Peak_Temp_new", "Order5:Peak_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Decomposer", "Herbivore", "Parasitoid", "Predator",
+                         "Temp", "Year", "Snowmelt:Decomposer", "Snowmelt:Herbivore", "Snowmelt:Parasitoid", "Snowmelt:Predator", "Temp:Decomposer", "Temp:Herbivore", "Temp:Parasitoid", "Temp:Predator"), title = "Peak ~ Snowmelt*Group + Temp*Group + Year + (1 | Year) + (1 | Taxa:Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "Compared group: Mixed feeder", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+ggplot(df_phen_event, aes(Snowmelt, Peak, group=interaction(Order), col=Order)) + 
+      #facet_grid(~N) +
+      ylab("Peak phenology")+
+      xlab("Timing of snowmelt")+
+      geom_point(alpha = 0.3) + 
+      geom_abline(intercept = 147.09, slope = 0.31, alpha = 0.5, linewidth = 1, col = "dodgerblue1")+
+      geom_abline(intercept = 136.50, slope = 0.42, alpha = 0.5, linewidth = 1, col = "dodgerblue4")+
+      geom_abline(intercept = 115.06, slope = 0.57, alpha = 0.5, linewidth = 1, col = "deepskyblue3")+
+      geom_abline(intercept = 99.57, slope = 0.57, alpha = 0.5, linewidth = 1, col = "blue1")+
+      geom_abline(intercept = 162.11, slope = 0.18, alpha = 0.5, linewidth = 1, col = "steelblue1")+
+      scale_color_manual(values = c("Decomposer" = "dodgerblue1",
+                                "Herbivor"="dodgerblue4",
+                                "Parasitoid"="deepskyblue3",
+                                "Pollinator"="blue1",
+                                "Predator"="steelblue1"))+ 
+      theme_bw()+
+      theme(axis.title.x = element_text(vjust = -1),
+            axis.title.y = element_text(vjust = 2),
+            legend.key.size = unit(1, 'cm'),
+            legend.key.width = unit(1, 'cm'))
+```
+
+Predators
+```{r}
+df_phen_event$Order <- as.factor(df_phen_event$Order)
+contrasts(df_phen_event$Order) <- contr.treatment(5, base = 5)
+
+
+model_pred <- lmer(Peak ~ 1 + Snowmelt*Order + Peak_Temp_new*Order + Year + (1 | Year) + (1 | SpeciesID:Plot) + (1 + Snowmelt + Peak_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model_pred)
+anova(model_pred)
+
+
+tab_model(model_pred, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)",  "Snowmelt", "Peak_Temp_new", "Year", "Order1", "Order2", "Order3", "Order4", "Snowmelt:Order1",  "Snowmelt:Order2",  "Snowmelt:Order3", "Snowmelt:Order4", "Order1:Peak_Temp_new",  "Order2:Peak_Temp_new",  "Order3:Peak_Temp_new", "Order4:Peak_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Decomposer", "Herbivore", "Parasitoid", "Mixed feeder",
+                         "Temp", "Year", "Snowmelt:Decomposer", "Snowmelt:Herbivore", "Snowmelt:Parasitoid", "Snowmelt:Mixed feeder", "Temp:Decomposer", "Temp:Herbivore", "Temp:Parasitoid", "Temp:Mixed feeder"), title = "Peak ~ Snowmelt*Group + Temp*Group + Year + (1 | Year) + (1 | Taxa:Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "Compared group: Predators", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+```
+
+
+
+Decomposer_duration
+```{r}
+df_phen_event$Order <- as.factor(df_phen_event$Order)
+contrasts(df_phen_event$Order) <- contr.treatment(5, base = 1)
+
+
+model_decomp <- lmer(Duration ~ 1 + Snowmelt*Order + Onset_Temp_new*Order + Year + (1 | Year) + (1 | SpeciesID:Plot) + (1 + Snowmelt + Onset_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model_decomp)
+sjPlot::plot_model(model_decomp,
+                   show.values=TRUE, show.p=TRUE)
+
+tab_model(model_decomp, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "Year", "Order2", "Order3", "Order4", "Order5", "Snowmelt:Order2",  "Snowmelt:Order3",  "Snowmelt:Order4", "Snowmelt:Order5", "Order2:Onset_Temp_new",  "Order3:Onset_Temp_new",  "Order4:Onset_Temp_new", "Order5:Onset_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Herbivore", "Parasitoid", "Mixed feeder", "Predator",
+                         "Temp", "Year", "Snowmelt:Herbivore", "Snowmelt:Parasitoid", "Snowmelt:Mixed feeder", "Snowmelt:Predator", "Temp:Herbivore", "Temp:Parasitoid", "Temp:Mixed feeder", "Temp:Predator"), title = "Duration ~ Snowmelt*Group + Temp*Group + Year + (1 | Year) + (1 | Taxa:Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "Compared group: Decomposer", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+```
+
+Herbivore_duration
+```{r}
+df_phen_event$Order <- as.factor(df_phen_event$Order)
+contrasts(df_phen_event$Order) <- contr.treatment(5, base = 2)
+
+
+model_herb <- lmer(Duration ~ 1 + Snowmelt*Order + Onset_Temp_new*Order + Year + (1 | Year) + (1 | SpeciesID:Plot) + (1 + Snowmelt + Onset_Temp_new | SpeciesID:Plot), data = df_phen_event)
+summary(model_herb)
+anova(model_herb)
+
+
+tab_model(model_herb, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "Year", "Order1", "Order3", "Order4", "Order5", "Snowmelt:Order1",  "Snowmelt:Order3",  "Snowmelt:Order4", "Snowmelt:Order5", "Order1:Onset_Temp_new",  "Order3:Onset_Temp_new",  "Order4:Onset_Temp_new", "Order5:Onset_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Decomposer", "Parasitoid", "Mixed feeder", "Predator",
+                         "Temp", "Year", "Snowmelt:Decomposer", "Snowmelt:Parasitoid", "Snowmelt:Mixed feeder", "Snowmelt:Predator", "Temp:Decomposer", "Temp:Parasitoid", "Temp:Mixed feeder", "Temp:Predator"), title = "Duration ~ Snowmelt*Group + Temp*Group + Year + (1 | Year) + (1 | Taxa:Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "Compared group: Herbivores", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+```
+
+Parasitoid_Duration
+```{r}
+df_phen_event$Order <- as.factor(df_phen_event$Order)
+contrasts(df_phen_event$Order) <- contr.treatment(5, base = 3)
+
+
+model_para <- lmer(Duration ~ 1 + Snowmelt*Order + Onset_Temp_new*Order + Year + (1 | Year) + (1 | SpeciesID:Plot) + (1 + Snowmelt + Onset_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model_para)
+anova(model_para)
+
+
+tab_model(model_para, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Year", "Onset_Temp_new", "Order1", "Order2", "Order4", "Order5", "Snowmelt:Order1",  "Snowmelt:Order2",  "Snowmelt:Order4", "Snowmelt:Order5", "Order1:Onset_Temp_new",  "Order2:Onset_Temp_new",  "Order4:Onset_Temp_new", "Order5:Onset_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Decomposer", "Herbivore", "Mixed feeder", "Predator", "Temp", "Year", "Snowmelt:Decomposer", "Snowmelt:Herbivore", "Snowmelt:Mixed feeder", "Snowmelt:Predator", "Temp:Decomposer", "Temp:Herbivore", "Temp:Mixed feeder", "Temp:Predator"), title = "Duration ~ Snowmelt*Group + Temp*Group + Year + (1 | Year) + (1 | Taxa:Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "Compared group: Parasitoids", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+```
+
+Pollinator_duration
+```{r}
+df_phen_event$Order <- as.factor(df_phen_event$Order)
+contrasts(df_phen_event$Order) <- contr.treatment(5, base = 4)
+
+
+
+model_poll <- lmer(Duration ~ 1 + Snowmelt*Order + Onset_Temp_new*Order + Year + (1 | Year) + (1 | SpeciesID:Plot) + (1 + Snowmelt + Onset_Temp_new | SpeciesID:Plot), data=df_phen_event)
+
+summary(model_poll)
+anova(model_poll)
+sjPlot::plot_model(model_poll,
+                   show.values=TRUE, show.p=TRUE)
+
+tab_model(model_poll, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Year", "Onset_Temp_new", "Order1", "Order2", "Order3", "Order5", "Snowmelt:Order1",  "Snowmelt:Order2",  "Snowmelt:Order3", "Snowmelt:Order5", "Order1:Onset_Temp_new",  "Order2:Onset_Temp_new",  "Order3:Onset_Temp_new", "Order5:Onset_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Decomposer", "Herbivore", "Parasitoid", "Predator", "Temp", "Year", "Snowmelt:Decomposer", "Snowmelt:Herbivore", "Snowmelt:Parasitoid", "Snowmelt:Predator", "Temp:Decomposer", "Temp:Herbivore", "Temp:Parasitoid", "Temp:Predator"), title = "Duration ~ Snowmelt*Group + Temp*Group + Year + (1 | Year) + (1 | Taxa:Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "Compared group: Mixed feeder", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+```
+
+Predators_duration
+
+```{r}
+df_phen_event$Order <- as.factor(df_phen_event$Order)
+contrasts(df_phen_event$Order) <- contr.treatment(5, base = 5)
+
+
+
+model_pred <- lmer(Duration ~ 1 + Snowmelt*Order + Onset_Temp_new*Order + Year + (1 | Year) + (1 | SpeciesID:Plot) + (1 + Snowmelt + Onset_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model_pred)
+anova(model_pred)
+sjPlot::plot_model(model_pred,
+                   show.values=TRUE, show.p=TRUE)
+
+tab_model(model_pred, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Year", "Onset_Temp_new", "Order1", "Order2", "Order3", "Order4", "Snowmelt:Order1",  "Snowmelt:Order2",  "Snowmelt:Order3", "Snowmelt:Order4", "Order1:Onset_Temp_new",  "Order2:Onset_Temp_new",  "Order3:Onset_Temp_new", "Order4:Onset_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Decomposer", "Herbivore", "Parasitoid", "Mixed feeder", "Temp", "Year", "Snowmelt:Decomposer", "Snowmelt:Herbivore", "Snowmelt:Parasitoid", "Snowmelt:Mixed feeder", "Temp:Decomposer", "Temp:Herbivore", "Temp:Parasitoid", "Temp:Mixed feeder"), title = "Duration ~ Snowmelt*Group + Temp*Group + Year + (1 | Year) + (1 | Taxa:Plot) + (1 + Temp + Snowmelt | Taxa:Plot)", dv.labels = "Compared group: Predators", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+```
+
+
+Early vs late emerging taxa
+```{r}
+df_phen_event$Emerge <- as.factor(df_phen_event$Emerge)
+contrasts(df_phen_event$Emerge) <- contr.treatment(2, base = 2)
+
+model1 <- lmer(Peak ~ 1 + Snowmelt*Emerge + Peak_Temp_new*Emerge + Year + (1 + Snowmelt + Peak_Temp_new | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Peak_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model1)
+#model <- lmer(Peak ~ 1 + Snowmelt + Peak_Temp_new + Year + (1 + Snowmelt + Peak_Temp_new | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Peak_Temp_new | SpeciesID:Plot), data=df_phen_event)
+
+tab_model(model1, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+           terms = c("(Intercept)", "Snowmelt", "Year", "Peak_Temp_new", "Emerge2", "Snowmelt:Emerge2", "Emerge2:Peak_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Late active", "Temp", "Year", "Snowmelt:Activity (late)", "Temp:Activity (late)"), title = "Peak ~ 1 + Snowmelt*Emerge + Temp*Emerge + Year + (1 + Snowmelt + Temp | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Temp | SpeciesID:Plot)", dv.labels = "Early vs late active taxa", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+
+summary(model1)
+
+model1 <- lmer(Onset ~ 1 + Snowmelt*Emerge + Onset_Temp_new*Emerge + Year + (1 + Snowmelt + Onset_Temp_new | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Onset_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model1)
+
+model2 <- lmer(End ~ 1 + Snowmelt*Emerge + End_Temp_new*Emerge + Year + (1 + Snowmelt + End_Temp_new | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + End_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model2)
+
+
+Peak <- ggplot(df_phen_event, aes(Snowmelt, Peak, group=interaction(Emerge), col=Emerge)) + 
+      #facet_grid(~N) +
+      ylab("Peak phenology")+
+      xlab("")+
+      geom_point(alpha = 0.4, size = 3) +
+      scale_color_manual(values = c("Early" = "turquoise4",
+                                "Late"="blue"))+ 
+      geom_abline(intercept = 150, slope = 0.26, col = "turquoise4", size = 3)+
+      geom_abline(intercept = 130, slope = 0.44, col = "blue", size = 3)+
+      geom_text(inherit.aes=FALSE, aes(x = 150, y = 235.5), label = "(a)")+
+      #geom_hline(yintercept=0, linetype="dashed") +
+      theme_bw()+
+      theme(panel.grid = element_blank(), axis.title.x = element_text(vjust = 0.5), legend.position = "none",
+            axis.title.y = element_text(vjust = 2))
+
+ggplot(df_phen_event, aes(Snowmelt, Peak, col = Emerge, group = SpeciesID)) + 
+      #facet_grid(~N) +
+      ylab("Peak phenology")+
+      xlab("")+
+      geom_point(alpha = 0.4, size = 3)+
+      geom_smooth(method = "lm", se = FALSE)+
+      facet_wrap(~ Habitat)+
+      theme_bw()
+
+```
+
+```{r}
+df_phen_event$Emerge <- as.factor(df_phen_event$Emerge)
+contrasts(df_phen_event$Emerge) <- contr.treatment(2, base = 2)
+
+model1 <- lmer(Duration ~ 1 + Snowmelt*Emerge + Onset_Temp_new*Emerge + Year + (1 + Snowmelt + Onset_Temp_new | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Onset_Temp_new | SpeciesID:Plot), data=df_phen_event)
+summary(model1)
+#model <- lmer(Peak ~ 1 + Snowmelt + Peak_Temp_new + Year + (1 + Snowmelt + Peak_Temp_new | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Peak_Temp_new | SpeciesID:Plot), data=df_phen_event)
+
+tab_model(model1, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+           terms = c("(Intercept)", "Snowmelt", "Year", "Onset_Temp_new", "Emerge2", "Snowmelt:Emerge2", "Emerge2:Onset_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Late active", "Temp", "Year", "Snowmelt:Activity (late)", "Temp:Activity (late)"), title = "Duration ~ 1 + Snowmelt*Emerge + Temp*Emerge + Year + (1 + Snowmelt + Temp | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Temp | SpeciesID:Plot)", dv.labels = "Early vs late active taxa", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+Peak_temp <- ggplot(df_phen_event, aes(Peak_Temp, Peak, group=interaction(Emerge), col=Emerge)) + 
+      #facet_grid(~N) +
+      ylab("Peak phenology")+
+      xlab("")+
+      geom_point(alpha = 0.4, size = 3) +
+      scale_color_manual(values = c("Early" = "turquoise4",
+                                "Late"="blue"))+ 
+      geom_abline(intercept = 373, slope = -1.11, col = "turquoise4", size = 3)+
+      geom_abline(intercept = 359, slope = -1.55, col = "blue", size = 3)+
+      geom_text(inherit.aes=FALSE, aes(x = -2, y = 235), label = "(a)")+
+      #geom_hline(yintercept=0, linetype="dashed") +
+      theme_bw()+
+      theme(panel.grid = element_blank(), axis.title.x = element_text(vjust = 0.5), legend.position = "none",
+            axis.title.y = element_text(vjust = 2))
+
+ggplot(df_phen_event, aes(Peak_Temp, Peak, col = Emerge, group = SpeciesID)) + 
+      #facet_grid(~N) +
+      ylab("Peak phenology")+
+      xlab("")+
+      geom_point(alpha = 0.4, size = 3)+
+      geom_smooth(method = "lm", se = FALSE)+
+      facet_wrap(~ Habitat)+
+      theme_bw()
+
+```
+
+Difference between flying and surface dwelling arthropods
+```{r}
+df_phen_event$Trait <- as.factor(df_phen_event$Trait)
+contrasts(df_phen_event$Trait) <- contr.treatment(2, base = 2)
+
+model <- lmer(Peak ~ 1 + Snowmelt*Trait + Peak_Temp_new*Trait + Year + (1 | Year) + 
+                (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Peak_Temp_new | speciesplot), data=df_phen_event)
+summary(model)
+
+
+tab_model(model, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+           terms = c("(Intercept)", "Snowmelt", "Year", "Peak_Temp_new", "TraitSurface",
+                     "Snowmelt:TraitSurface"),
+         pred.labels = c("Intercept", "Snowmelt", "Surface dwelling", "Temp", "Year", "Snowmelt:Surface dwelling"), 
+         title = "Peak ~ 1 + Snowmelt*Trait + Temp*Trait + Year + (1 + Snowmelt
+         + Temp | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Temp | SpeciesID:Plot)",
+         dv.labels = "Flying vs surface dwelling taxa", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p =
+           "P-Value")
+
+df_phen_event$Trait <- as.factor(df_phen_event$Trait)
+contrasts(df_phen_event$Trait) <- contr.treatment(2, base = 1)
+
+model <- lmer(Peak ~ Snowmelt*Trait*Emerge + Peak_Temp_new*Trait*Emerge + Year + 
+                 (1 + Peak_Temp_new | speciesplot), data=df_phen_event)
+summary(model)
+
+tab_model(model, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+           terms = c("(Intercept)", "Snowmelt", "TraitSurface", "EmergeLate", "Year", "Peak_Temp_new",
+                     "Snowmelt:TraitSurface", "EmergeLate:Peak_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Surface dwelling", "EmergeLate", "Temp", "Year", "Snowmelt:Surface dwelling",
+                         "EmergeLate:Temp"), 
+         title = "Peak ~ 1 + Snowmelt*Trait*Emerge + Temp*Trait*Emerge + Year + (1 + Snowmelt + Temp | SpeciesID:Plot)",
+         dv.labels = "Early/late and flying/surface taxa", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p =
+           "P-Value")
+
+model <- lmer(Duration ~ Snowmelt*Trait*Emerge + Onset_Temp_new*Trait*Emerge + Year + 
+                 (1 + Onset_Temp_new | speciesplot), data=df_phen_event)
+summary(model)
+
+tab_model(model, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+           terms = c("(Intercept)", "Snowmelt", "TraitSurface", "EmergeLate", "Year", "Onset_Temp_new",
+                     "Snowmelt:TraitSurface", "Snowmelt:TraitSurface:EmergeLate"),
+         pred.labels = c("Intercept", "Snowmelt", "Surface dwelling", "EmergeLate", "Temp", "Year", "Snowmelt:Surface dwelling", "Snowmelt:Surfacedwelling: EmergeLate"), 
+         title = "Duration ~ 1 + Snowmelt*Trait*Emerge + Temp*Trait*Emerge + Year + (1 + Snowmelt + Temp | SpeciesID:Plot)",
+         dv.labels = "Early/late and flying/surface taxa", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p =
+           "P-Value")
+
+
+```
+
+```{r}
+df_phen_event$Trait <- as.factor(df_phen_event$Trait)
+contrasts(df_phen_event$Trait) <- contr.treatment(2, base = 2)
+
+model <- lmer(Duration ~ 1 + Snowmelt*Trait + Onset_Temp_new*Trait + Year + (1 | Year) + 
+                (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Onset_Temp_new | speciesplot), data=df_phen_event)
+summary(model)
+
+tab_model(model, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+           terms = c("(Intercept)", "Snowmelt", "Year", "Onset_Temp_new", "TraitSurface",
+                     "Snowmelt:TraitSurface", "TraitSurface:Onset_Temp_new"),
+         pred.labels = c("Intercept", "Snowmelt", "Surface dwelling", "Temp", "Year", "Snowmelt:Surface dwelling",
+                         "Temp:Surface dwelling"), 
+         title = "Duration ~ 1 + Snowmelt*Trait + Temp*Trait + Year + (1 + Snowmelt
+         + Temp | SpeciesID) + (1 | Year) + (1 | Year:SpeciesID) + (1 | Plot) + (1 + Snowmelt + Temp | SpeciesID:Plot)",
+         dv.labels = "Flying vs surface dwelling taxa", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p =
+           "P-Value")
+
+```
+
+
+```{r}
+df_sub <- subset(df_phen_event, Order == "Mixed feeder" )
+df_sub1 <- subset(df_phen_event, Order == "Predator" )
+df_sub2 <- subset(df_phen_event, Order == "Herbivor" )
+df_sub3 <- subset(df_phen_event, Order == "Parasitoid" )
+df_sub4 <- subset(df_phen_event, Order == "Decomposer" )
+
+df_sub <- subset(df_sub,!SpeciesID == "Scathophagidae")
+
+```
+
+
+```{r}
+unique(df_sub$SpeciesID)
+df_sub$SpeciesID <- as.factor(df_sub$SpeciesID)
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 1)
+
+
+model3 <- lmer(Peak ~ 1 + Peak_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Peak_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+           terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "Year", "SpeciesID2", "SpeciesID3", "SpeciesID4", "SpeciesID5", "SpeciesID6", "SpeciesID2:Snowmelt", "SpeciesID3:Snowmelt", "SpeciesID4:Snowmelt", "SpeciesID5:Snowmelt", "SpeciesID6:Snowmelt", "Peak_Temp_new:SpeciesID2", "Peak_Temp_new:SpeciesID3", "Peak_Temp_new:SpeciesID4", "Peak_Temp_new:SpeciesID5", "Peak_Temp_new:SpeciesID6"),
+         pred.labels = c("Intercept", "Temp", "Chironomidae", "Culicidae", "Sciaridae", "Nymphalidae", "Phoridae",
+                         "Snowmelt", "Year", "Temp:Chironomidae", "Temp:Culicidae", "Temp:Sciaridae", "Temp:Nymphalidae", "Temp:Phoridae", "Snowmelt:Chironomidae", "Snowmelt:Culicidae", "Snowmelt:Sciaridae", "Snowmelt:Nymphalidae", "Snowmelt:Phoridae"), title = "Peak ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Peak_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Muscidae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 2)
+
+model3 <- lmer(Peak ~ 1 + Peak_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Peak_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+           terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "Year", "SpeciesID1", "SpeciesID3", "SpeciesID4", "SpeciesID5", "SpeciesID6", "SpeciesID1:Snowmelt", "SpeciesID3:Snowmelt", "SpeciesID4:Snowmelt", "SpeciesID5:Snowmelt", "SpeciesID6:Snowmelt", "Peak_Temp_new:SpeciesID1", "Peak_Temp_new:SpeciesID3", "Peak_Temp_new:SpeciesID4", "Peak_Temp_new:SpeciesID5", "Peak_Temp_new:SpeciesID6"),
+         pred.labels = c("Intercept", "Temp", "Muscidae", "Culicidae", "Sciaridae", "Nymphalidae", "Phoridae", "Snowmelt",
+                         "Year", "Temp:Muscidae", "Temp:Culicidae", "Temp:Sciaridae", "Temp:Nymphalidae", "Temp:Phoridae",
+                         "Snowmelt:Muscidae", "Snowmelt:Culicidae", "Snowmelt:Sciaridae", "Snowmelt:Nymphalidae",
+                         "Snowmelt:Phoridae"), title = "Peak ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Peak_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Chironomidae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 3)
+
+model3 <- lmer(Peak ~ 1 + Peak_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Peak_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "Year", "SpeciesID1", "SpeciesID2", "SpeciesID4", "SpeciesID5", "SpeciesID6", "SpeciesID1:Snowmelt", "SpeciesID2:Snowmelt", "SpeciesID4:Snowmelt", "SpeciesID5:Snowmelt", "SpeciesID6:Snowmelt", "Peak_Temp_new:SpeciesID1", "Peak_Temp_new:SpeciesID2", "Peak_Temp_new:SpeciesID4", "Peak_Temp_new:SpeciesID5", "Peak_Temp_new:SpeciesID6"),
+         pred.labels = c("Intercept", "Temp", "Muscidae", "Chironomidae", "Sciaridae", "Nymphalidae", "Phoridae",
+                         "Snowmelt", "Year", "Temp:Muscidae", "Temp:Chironomidae", "Temp:Sciaridae", "Temp:Nymphalidae",
+                         "Temp:Phoridae", "Snowmelt:Muscidae", "Snowmelt:Chironomidae", "Snowmelt:Sciaridae",
+                         "Snowmelt:Nymphalidae", "Snowmelt:Phoridae"), title = "Peak ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Peak_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Culicidae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 4)
+
+model3 <- lmer(Peak ~ 1 + Peak_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Peak_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "Year", "SpeciesID1", "SpeciesID2", "SpeciesID3", "SpeciesID5", "SpeciesID6", "SpeciesID1:Snowmelt", "SpeciesID2:Snowmelt", "SpeciesID3:Snowmelt", "SpeciesID5:Snowmelt", "SpeciesID6:Snowmelt", "Peak_Temp_new:SpeciesID1", "Peak_Temp_new:SpeciesID2", "Peak_Temp_new:SpeciesID3", "Peak_Temp_new:SpeciesID5", "Peak_Temp_new:SpeciesID6"),
+         pred.labels = c("Intercept", "Temp", "Muscidae", "Chironomidae", "Culicidae", "Nymphalidae", "Phoridae",
+                         "Snowmelt", "Year", "Temp:Muscidae", "Temp:Chironomidae", "Temp:Culicidae", "Temp:Nymphalidae",
+                         "Temp:Phoridae", "Snowmelt:Muscidae", "Snowmelt:Chironomidae", "Snowmelt:Culicidae", "Snowmelt:Nymphalidae", "Snowmelt:Phoridae"), title = "Peak ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Peak_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Sciaridae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 5)
+
+model3 <- lmer(Peak ~ 1 + Peak_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Peak_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "Year", "SpeciesID1", "SpeciesID2", "SpeciesID3", "SpeciesID4", "SpeciesID6", "SpeciesID1:Snowmelt", "SpeciesID2:Snowmelt", "SpeciesID3:Snowmelt", "SpeciesID4:Snowmelt", "SpeciesID6:Snowmelt", "Peak_Temp_new:SpeciesID1", "Peak_Temp_new:SpeciesID2", "Peak_Temp_new:SpeciesID3", "Peak_Temp_new:SpeciesID4", "Peak_Temp_new:SpeciesID6"),
+         pred.labels = c("Intercept", "Temp", "Muscidae", "Chironomidae", "Culicidae", "Sciaridae", "Phoridae",
+                         "Snowmelt", "Year", "Temp:Muscidae", "Temp:Chironomidae", "Temp:Culicidae", "Temp:Sciaridae",
+                         "Temp:Phoridae", "Snowmelt:Muscidae", "Snowmelt:Chironomidae", "Snowmelt:Culicidae", "Snowmelt:Sciaridae", "Snowmelt:Phoridae"), title = "Peak ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Peak_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Nymphalidae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 6)
+
+model3 <- lmer(Peak ~ 1 + Peak_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Peak_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+anova(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "Year", "SpeciesID1", "SpeciesID2", "SpeciesID3", "SpeciesID4", "SpeciesID5", "SpeciesID1:Snowmelt", "SpeciesID2:Snowmelt", "SpeciesID3:Snowmelt", "SpeciesID4:Snowmelt", "SpeciesID5:Snowmelt", "Peak_Temp_new:SpeciesID1", "Peak_Temp_new:SpeciesID2", "Peak_Temp_new:SpeciesID3", "Peak_Temp_new:SpeciesID4", "Peak_Temp_new:SpeciesID5"),
+         pred.labels = c("Intercept", "Temp", "Muscidae", "Chironomidae", "Culicidae", "Sciaridae", "Nymphalidae",
+                         "Snowmelt", "Year", "Temp:Muscidae", "Temp:Chironomidae", "Temp:Culicidae", "Temp:Sciaridae",
+                         "Temp:Phoridae", "Snowmelt:Muscidae", "Snowmelt:Chironomidae", "Snowmelt:Culicidae", "Snowmelt:Sciaridae", "Snowmelt:Nymphalidae"), title = "Peak ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Peak_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Phoridae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+Pollinator <- ggplot(df_sub, aes(Snowmelt, Peak, group=interaction(SpeciesID), col=SpeciesID)) + 
+      #facet_grid(~N) +
+      ylab("Peak phenology")+
+      xlab("Timing of snowmelt")+
+      #ylim(155, 240)+
+      geom_point(alpha = 0.5, size = 3) + 
+      geom_abline(intercept = 89.79, slope = 0.63, alpha = 0.5, linewidth = 2, col = "dodgerblue1")+
+      geom_abline(intercept = 91.18, slope = 0.58, alpha = 0.5, linewidth = 2, col = "dodgerblue4")+
+      geom_abline(intercept = 153.77, slope = 0.30, alpha = 0.5, linewidth = 2, col = "deepskyblue3")+
+      geom_abline(intercept = 82.46, slope = 0.64, alpha = 0.5, linewidth = 2, col = "grey47")+
+      geom_abline(intercept = 59.61, slope = 0.90, alpha = 0.5, linewidth = 2, col = "blue1")+
+      geom_abline(intercept = 171.16, slope = 0.25, alpha = 0.5, linewidth = 2, col = "slateblue2")+
+      scale_color_manual(values = c("ANMU" = "dodgerblue1",
+                                "CHCE"="dodgerblue4",
+                                "Culicidae"="deepskyblue3",
+                                "MYSC"="grey47",
+                                "Nymphalidae"="blue1",
+                                "Phoridae"="slateblue2"))+ 
+      theme_bw()+
+      theme(axis.title.x = element_text(vjust = -1),
+            axis.title.y = element_text(vjust = 2),
+            legend.key.size = unit(1, 'cm'),
+            legend.key.width = unit(1, 'cm'))
+
+ggplot(df_Phoridae, aes(Snowmelt, Peak))+
+  geom_point()+
+  geom_smooth(method="lm")
+lm <- lm(Peak ~ Snowmelt , df_Phoridae)
+summary(lm)
+
+
+#DURATION
+
+df_sub$SpeciesID <- as.factor(df_sub$SpeciesID)
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 1)
+
+model3 <- lmer(Duration ~ 1 + Onset_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Onset_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "Year", "SpeciesID2", "SpeciesID3", "SpeciesID4", "SpeciesID5", "SpeciesID6", "SpeciesID2:Snowmelt", "SpeciesID3:Snowmelt", "SpeciesID4:Snowmelt", "SpeciesID5:Snowmelt", "SpeciesID6:Snowmelt", "Onset_Temp_new:SpeciesID2", "Onset_Temp_new:SpeciesID3", "Onset_Temp_new:SpeciesID4", "Onset_Temp_new:SpeciesID5", "Onset_Temp_new:SpeciesID6"),
+         pred.labels = c("Intercept", "Temp", "Chironomidae", "Culicidae", "Sciaridae", "Nymphalidae", "Phoridae",
+                         "Snowmelt", "Year", "Temp:Chironomidae", "Temp:Culicidae", "Temp:Sciaridae", "Temp:Nymphalidae", "Temp:Phoridae", "Snowmelt:Chironomidae", "Snowmelt:Culicidae", "Snowmelt:Sciaridae", "Snowmelt:Nymphalidae", "Snowmelt:Phoridae"), title = "Duration ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Onset_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Muscidae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 2)
+
+model3 <- lmer(Duration ~  1 + Onset_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Onset_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "Year", "SpeciesID1", "SpeciesID3", "SpeciesID4", "SpeciesID5", "SpeciesID6", "SpeciesID1:Snowmelt", "SpeciesID3:Snowmelt", "SpeciesID4:Snowmelt", "SpeciesID5:Snowmelt", "SpeciesID6:Snowmelt", "Onset_Temp_new:SpeciesID1", "Onset_Temp_new:SpeciesID3", "Onset_Temp_new:SpeciesID4", "Onset_Temp_new:SpeciesID5", "Onset_Temp_new:SpeciesID6"),
+         pred.labels = c("Intercept", "Temp", "Muscidae", "Culicidae", "Sciaridae", "Nymphalidae", "Phoridae", "Snowmelt",
+                         "Year", "Temp:Muscidae", "Temp:Culicidae", "Temp:Sciaridae", "Temp:Nymphalidae", "Temp:Phoridae",
+                         "Snowmelt:Muscidae", "Snowmelt:Culicidae", "Snowmelt:Sciaridae", "Snowmelt:Nymphalidae",
+                         "Snowmelt:Phoridae"), title =  "Duration ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Onset_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Chironomidae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 3)
+
+model3 <- lmer(Duration ~ 1 + Onset_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Onset_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "Year", "SpeciesID1", "SpeciesID2", "SpeciesID4", "SpeciesID5", "SpeciesID6", "SpeciesID1:Snowmelt", "SpeciesID2:Snowmelt", "SpeciesID4:Snowmelt", "SpeciesID5:Snowmelt", "SpeciesID6:Snowmelt", "Onset_Temp_new:SpeciesID1", "Onset_Temp_new:SpeciesID2", "Onset_Temp_new:SpeciesID4", "Onset_Temp_new:SpeciesID5", "Onset_Temp_new:SpeciesID6"),
+         pred.labels = c("Intercept", "Temp", "Muscidae", "Chironomidae", "Sciaridae", "Nymphalidae", "Phoridae",
+                         "Snowmelt", "Year", "Temp:Muscidae", "Temp:Chironomidae", "Temp:Sciaridae", "Temp:Nymphalidae",
+                         "Temp:Phoridae", "Snowmelt:Muscidae", "Snowmelt:Chironomidae", "Snowmelt:Sciaridae",
+                         "Snowmelt:Nymphalidae", "Snowmelt:Phoridae"), title = "Duration ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Onset_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Culicidae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 4)
+
+model3 <- lmer(Duration ~ 1 + Onset_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Onset_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "Year", "SpeciesID1", "SpeciesID2", "SpeciesID3", "SpeciesID5", "SpeciesID6", "SpeciesID1:Snowmelt", "SpeciesID2:Snowmelt", "SpeciesID3:Snowmelt", "SpeciesID5:Snowmelt", "SpeciesID6:Snowmelt", "Onset_Temp_new:SpeciesID1", "Onset_Temp_new:SpeciesID2", "Onset_Temp_new:SpeciesID3", "Onset_Temp_new:SpeciesID5", "Onset_Temp_new:SpeciesID6"),
+         pred.labels = c("Intercept", "Temp", "Muscidae", "Chironomidae", "Culicidae", "Nymphalidae", "Phoridae",
+                         "Snowmelt", "Year", "Temp:Muscidae", "Temp:Chironomidae", "Temp:Culicidae", "Temp:Nymphalidae",
+                         "Temp:Phoridae", "Snowmelt:Muscidae", "Snowmelt:Chironomidae", "Snowmelt:Culicidae", "Snowmelt:Nymphalidae", "Snowmelt:Phoridae"), title = "Duration ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Onset_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Sciaridae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 5)
+
+model3 <- lmer(Duration ~ 1 + Onset_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Onset_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "Year", "SpeciesID1", "SpeciesID2", "SpeciesID3", "SpeciesID4", "SpeciesID6", "SpeciesID1:Snowmelt", "SpeciesID2:Snowmelt", "SpeciesID3:Snowmelt", "SpeciesID4:Snowmelt", "SpeciesID6:Snowmelt", "Onset_Temp_new:SpeciesID1", "Onset_Temp_new:SpeciesID2", "Onset_Temp_new:SpeciesID3", "Onset_Temp_new:SpeciesID4", "Onset_Temp_new:SpeciesID6"),
+         pred.labels = c("Intercept", "Temp", "Muscidae", "Chironomidae", "Culicidae", "Sciaridae", "Phoridae",
+                         "Snowmelt", "Year", "Temp:Muscidae", "Temp:Chironomidae", "Temp:Culicidae", "Temp:Sciaridae",
+                         "Temp:Phoridae", "Snowmelt:Muscidae", "Snowmelt:Chironomidae", "Snowmelt:Culicidae", "Snowmelt:Sciaridae", "Snowmelt:Phoridae"), title = "Duration ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Onset_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Nymphalidae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+contrasts(df_sub$SpeciesID) <- contr.treatment(6, base = 6)
+
+model3 <- lmer(Duration ~ 1 + Onset_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Onset_Temp_new | SpeciesID:Plot), data=df_sub)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+           terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "Year", "SpeciesID1", "SpeciesID2", "SpeciesID3", "SpeciesID4", "SpeciesID5", "SpeciesID1:Snowmelt", "SpeciesID2:Snowmelt", "SpeciesID3:Snowmelt", "SpeciesID4:Snowmelt", "SpeciesID5:Snowmelt", "Onset_Temp_new:SpeciesID1", "Onset_Temp_new:SpeciesID2", "Onset_Temp_new:SpeciesID3", "Onset_Temp_new:SpeciesID4", "Onset_Temp_new:SpeciesID5"),
+         pred.labels = c("Intercept", "Temp", "Muscidae", "Chironomidae", "Culicidae", "Sciaridae", "Nymphalidae",
+                         "Snowmelt", "Year", "Temp:Muscidae", "Temp:Chironomidae", "Temp:Culicidae", "Temp:Sciaridae",
+                         "Temp:Phoridae", "Snowmelt:Muscidae", "Snowmelt:Chironomidae", "Snowmelt:Culicidae", "Snowmelt:Sciaridae", "Snowmelt:Nymphalidae"), title = "Duration ~ Temp*Taxon + Snowmelt*Taxon + Year + (1 + Onset_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Phoridae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+
+```
+
+Herbivores
+```{r}
+unique(df_sub2$Plot)
+df_sub2$SpeciesID <- as.factor(df_sub2$SpeciesID)
+contrasts(df_sub2$SpeciesID) <- contr.treatment(2, base = 2)
+
+model3 <- lmer(Peak ~ 1 + Peak_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Peak_Temp_new | SpeciesID:Plot), data=df_sub2)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "SpeciesID1", "Year", "Peak_Temp_new:SpeciesID1", "SpeciesID1:Snowmelt"),
+         pred.labels = c("Intercept", "Temp", "Aphidoidea", "Snowmelt", "Year", "Temp:Aphidoidea", "Snowmelt:Aphidoidea"), title = "Peak ~ Snowmelt*Taxon + Temp*Taxon + Year + (1 + Peak_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Coccoidea", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+
+model3 <- lmer(Duration ~ 1 + Onset_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Onset_Temp_new | SpeciesID:Plot), data=df_sub2)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "SpeciesID1", "Year", "Onset_Temp_new:SpeciesID1", "SpeciesID1:Snowmelt"),
+         pred.labels = c("Intercept", "Temp", "Aphidoidea", "Snowmelt", "Year", "Temp:Aphidoidea", "Snowmelt:Aphidoidea"), title = "Duration ~ Snowmelt*Taxon + Temp*Taxon + Year + (1 + Onset_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Coccoidea", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+
+```
+
+Parasitoids
+```{r}
+df_sub3$SpeciesID <- as.factor(df_sub3$SpeciesID)
+contrasts(df_sub3$SpeciesID) <- contr.treatment(2, base = 1)
+
+model3 <- lmer(Peak ~ 1 + Peak_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Peak_Temp_new | SpeciesID:Plot), data=df_sub3)
+summary(model3)
+anova(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "SpeciesID2", "Year", "Peak_Temp_new:SpeciesID2", "SpeciesID2:Snowmelt"),
+         pred.labels = c("Intercept", "Temp", "Ichneumonidae", "Snowmelt", "Year", "Temp:Ichneumonidae", "Snowmelt:Ichneumonidae"), title = "Peak ~ Snowmelt*Taxon + Temp*Taxon + Year + (1 + Peak_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Chalcidoidea", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+
+model3 <- lmer(Duration ~ 1 + Onset_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Onset_Temp_new | SpeciesID:Plot), data=df_sub3)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "SpeciesID2", "Year", "Onset_Temp_new:SpeciesID2", "SpeciesID2:Snowmelt"),
+         pred.labels = c("Intercept", "Temp", "Ichneumonidae", "Snowmelt", "Year", "Temp:Ichneumonidae", "Snowmelt:Ichneumonidae"), title = "Duration ~ Snowmelt*Taxon + Temp*Taxon + Year + (1 + Onset_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Coccoidea", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+
+```
+
+Decomposers
+```{r}
+df_sub4$SpeciesID <- as.factor(df_sub4$SpeciesID)
+contrasts(df_sub4$SpeciesID) <- contr.treatment(2, base = 1)
+
+model3 <- lmer(Peak ~ 1 + Peak_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Peak_Temp_new | SpeciesID:Plot), data=df_sub4)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "SpeciesID2", "Year", "Peak_Temp_new:SpeciesID2", "SpeciesID2:Snowmelt"),
+         pred.labels = c("Intercept", "Temp", "Collembola", "Snowmelt", "Year", "Temp:Collembola", "Snowmelt:Collembola"), title = "Peak ~ Snowmelt*Taxon + Temp*Taxon + Year + (1 + Peak_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Acari", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+
+model3 <- lmer(Duration ~ 1 + Onset_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Onset_Temp_new | SpeciesID:Plot), data=df_sub4)
+summary(model3)
+anova(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "SpeciesID2", "Year", "Onset_Temp_new:SpeciesID2", "SpeciesID2:Snowmelt"),
+         pred.labels = c("Intercept", "Temp", "Collembola", "Snowmelt", "Year", "Temp:Collembola", "Snowmelt:Collembola"), title = "Duration ~ Snowmelt*Taxon + Temp*Taxon + Year + (1 + Onset_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Acari", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+
+```
+
+Predators
+```{r}
+df_sub1$SpeciesID <- as.factor(df_sub1$SpeciesID)
+contrasts(df_sub1$SpeciesID) <- contr.treatment(3, base = 1)
+
+model3 <- lmer(Peak ~ 1 + Peak_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Peak_Temp_new | SpeciesID:Plot), data=df_sub1)
+summary(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Peak_Temp_new", "SpeciesID2", "SpeciesID3", "Year", "Peak_Temp_new:SpeciesID2", "Peak_Temp_new:SpeciesID3", "SpeciesID2:Snowmelt", "SpeciesID3:Snowmelt"),
+         pred.labels = c("Intercept", "Temp", "Lycosidae", "Thomisidae", "Snowmelt", "Year", "Temp:Lycosidae",
+                         "Temp:Thomisidae", "Snowmelt:Lycosidae","Snowmelt:Thomisidae"), title = "Peak ~ Snowmelt*Taxon + Temp*Taxon + Year + (1 + Peak_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Linyphiidae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+
+model3 <- lmer(Duration ~ 1 + Onset_Temp_new*SpeciesID + Snowmelt*SpeciesID + Year + (1 + Onset_Temp_new | SpeciesID:Plot), data=df_sub1)
+summary(model3)
+anova(model3)
+
+tab_model(model3, show.intercept = TRUE, show.est = TRUE, show.se = TRUE, show.p = TRUE, show.stat = TRUE, show.ci = FALSE,
+          terms = c("(Intercept)", "Snowmelt", "Onset_Temp_new", "SpeciesID2", "SpeciesID3", "Year", "Onset_Temp_new:SpeciesID2", "Onset_Temp_new:SpeciesID3", "SpeciesID2:Snowmelt", "SpeciesID3:Snowmelt"),
+         pred.labels = c("Intercept", "Temp", "Lycosidae", "Thomisidae", "Snowmelt", "Year", "Temp:Lycosidae",
+                         "Temp:Thomisidae", "Snowmelt:Lycosidae","Snowmelt:Thomisidae"), title = "Duration ~ Snowmelt*Taxon + Temp*Taxon + Year + (1 + Onset_Temp_new | SpeciesID:Plot)", dv.labels = "Taxa compared: Linyphiidae", string.est = "Coeff", string.se = "SE", string.stat = "t", string.p = "P-Value")
+
+
+```
+
+
